@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>픽셀 돋보기 — 이미지를 확대해서 화소 살펴보기</title>
+<link rel="stylesheet" href="../assets/common.css">
+<script src="../assets/common.js" data-home="../index.html" defer></script>
+<style>
+  :root{
+    --bg:#f4f6fa; --panel:#ffffff; --line:#e3e8f0; --ink:#1d2433; --sub:#68738a;
+    --accent:#3e63dd; --accent-soft:#eef2ff;
+    --r:#e5484d; --g:#2f9e63; --b:#3e63dd;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    background:var(--bg); color:var(--ink); display:flex; flex-direction:column; overflow:hidden;
+  }
+  /* ---------- 헤더 ---------- */
+  header{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  .logo{display:flex; align-items:center; gap:8px; font-weight:800; font-size:17px; margin-right:6px;}
+  .logo .cube{width:22px; height:22px; border-radius:5px;
+    background:conic-gradient(from 45deg,#ffb224 0 25%,#e5484d 0 50%,#3e63dd 0 75%,#2f9e63 0);
+    image-rendering:pixelated;}
+  button{
+    font:inherit; border:1px solid var(--line); background:var(--panel); color:var(--ink);
+    padding:7px 12px; border-radius:9px; cursor:pointer; font-size:14px; line-height:1;
+    display:inline-flex; align-items:center; gap:6px; transition:background .12s,border-color .12s;
+    user-select:none; -webkit-user-select:none;
+  }
+  button:hover{background:#f2f5fb;}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700;}
+  button.primary:hover{background:#3357c8;}
+  .zoomgroup{display:flex; align-items:center; gap:2px; border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:2px;}
+  .zoomgroup button{border:none; padding:6px 11px; border-radius:8px; font-weight:700; font-size:16px;}
+  .zoomlabel{min-width:74px; text-align:center; font-size:13px; color:var(--sub); font-variant-numeric:tabular-nums;}
+  .spacer{flex:1;}
+  .toggle{display:inline-flex; align-items:center; gap:6px; font-size:13.5px; color:var(--sub); cursor:pointer; user-select:none;}
+  .toggle input{accent-color:var(--accent); width:15px; height:15px; cursor:pointer;}
+
+  /* ---------- 본문 ---------- */
+  main{flex:1; display:flex; min-height:0;}
+  #stage{position:relative; flex:1; min-width:0; background:#eceff5;}
+  #canvas{position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab; touch-action:none;}
+  #canvas.grabbing{cursor:grabbing;}
+  #canvas.picking{cursor:crosshair;}
+
+  /* 시작 안내(빈 화면) */
+  #dropzone{
+    position:absolute; inset:18px; border:2.5px dashed #b9c3d8; border-radius:18px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    background:rgba(255,255,255,.75); backdrop-filter:blur(2px); text-align:center; padding:24px;
+    transition:border-color .15s, background .15s;
+  }
+  #dropzone.hidden{display:none;}
+  #dropzone.dragover{border-color:var(--accent); background:var(--accent-soft);}
+  #dropzone .big{font-size:44px;}
+  #dropzone h1{font-size:21px; font-weight:800;}
+  #dropzone p{color:var(--sub); font-size:14.5px; line-height:1.7;}
+  #dropzone kbd{
+    background:#fff; border:1px solid var(--line); border-bottom-width:2.5px; border-radius:6px;
+    padding:2px 7px; font:inherit; font-size:13px; font-weight:700;
+  }
+  .samplerow{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:2px;}
+
+  /* 드래그 오버 전체 화면 표시 */
+  #dragveil{
+    position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    background:rgba(62,99,221,.12); border:4px dashed var(--accent); font-size:22px; font-weight:800; color:var(--accent);
+    pointer-events:none;
+  }
+  #dragveil.on{display:flex;}
+
+  /* 하단 힌트 바 */
+  #hintbar{
+    position:absolute; left:50%; bottom:12px; transform:translateX(-50%);
+    background:rgba(29,36,51,.82); color:#fff; font-size:13px; padding:7px 14px; border-radius:99px;
+    pointer-events:none; white-space:nowrap; opacity:0; transition:opacity .3s;
+  }
+  #hintbar.show{opacity:1;}
+
+  /* ---------- 오른쪽 정보 패널 ---------- */
+  aside{
+    width:272px; flex:none; background:var(--panel); border-left:1px solid var(--line);
+    padding:16px; overflow-y:auto; display:flex; flex-direction:column; gap:14px;
+  }
+  .card{border:1px solid var(--line); border-radius:14px; padding:13px 14px;}
+  .card h2{font-size:12.5px; font-weight:700; color:var(--sub); letter-spacing:.02em; margin-bottom:9px;}
+  #imginfo{font-size:14px; line-height:1.6; color:var(--ink);}
+  #imginfo b{font-variant-numeric:tabular-nums;}
+
+  #pixelcard.pinned{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft);}
+  .swatchrow{display:flex; align-items:center; gap:12px; margin-bottom:11px;}
+  #swatch{
+    width:56px; height:56px; border-radius:12px; border:1px solid var(--line); flex:none;
+    background:
+      linear-gradient(45deg,#d9dee8 25%,transparent 25%,transparent 75%,#d9dee8 75%),
+      linear-gradient(45deg,#d9dee8 25%,#fff 25%,#fff 75%,#d9dee8 75%);
+    background-size:14px 14px; background-position:0 0,7px 7px; position:relative; overflow:hidden;
+  }
+  #swatch::after{content:""; position:absolute; inset:0; background:var(--swatch-color,transparent);}
+  .coords{font-size:14px; line-height:1.55;}
+  .coords .xy{font-weight:800; font-size:16px; font-variant-numeric:tabular-nums;}
+  .coords .note{font-size:12px; color:var(--sub);}
+  .chan{display:grid; grid-template-columns:16px 1fr 38px; align-items:center; gap:8px; margin:7px 0; font-size:13.5px;}
+  .chan .name{font-weight:800;}
+  .chan .track{height:10px; border-radius:99px; background:#eef1f6; overflow:hidden;}
+  .chan .fill{height:100%; border-radius:99px; width:0%; transition:width .08s linear;}
+  .chan .val{text-align:right; font-variant-numeric:tabular-nums; font-weight:700;}
+  .chan.r .name{color:var(--r);} .chan.r .fill{background:var(--r);}
+  .chan.g .name{color:var(--g);} .chan.g .fill{background:var(--g);}
+  .chan.b .name{color:var(--b);} .chan.b .fill{background:var(--b);}
+  #alpharow{display:none; font-size:12.5px; color:var(--sub); margin-top:4px;}
+  #hexchip{
+    margin-top:10px; width:100%; justify-content:center; font-family:ui-monospace,Consolas,monospace;
+    font-size:14px; font-weight:700; letter-spacing:.03em;
+  }
+  #pinstate{margin-top:9px; font-size:12.5px; color:var(--sub); text-align:center; line-height:1.5;}
+  #pinstate.on{color:var(--accent); font-weight:700;}
+  .empty-msg{color:var(--sub); font-size:13.5px; text-align:center; padding:14px 4px; line-height:1.7;}
+  .tipcard{background:var(--accent-soft); border-color:#d5deff;}
+  .tipcard p{font-size:12.8px; color:#3b4a86; line-height:1.7;}
+
+  /* 좁은 화면: 패널을 아래로 */
+  @media (max-width:760px){
+    main{flex-direction:column;}
+    aside{width:100%; border-left:none; border-top:1px solid var(--line); flex-direction:row; flex-wrap:wrap;}
+    aside .card{flex:1 1 220px;}
+    .tipcard{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><div class="cube"></div>픽셀 돋보기</div>
+  <button class="primary" id="btnOpen">📂 이미지 열기</button>
+  <button id="btnPaste">📋 붙여넣기</button>
+  <div class="zoomgroup">
+    <button id="btnZoomOut" title="축소">−</button>
+    <div class="zoomlabel" id="zoomLabel">–</div>
+    <button id="btnZoomIn" title="확대">＋</button>
+  </div>
+  <button id="btnFit">🖼️ 전체 보기</button>
+  <button id="btnPixel">🔍 픽셀 보기</button>
+  <label class="toggle"><input type="checkbox" id="chkGrid" checked>격자</label>
+  <div class="spacer"></div>
+  <a class="home-btn" href="../index.html">← 목차</a>
+</header>
+
+<main>
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+
+    <div id="dropzone">
+      <div class="big">🖼️➜🔍</div>
+      <h1>이미지를 확대해서 화소(픽셀)를 관찰해 보세요</h1>
+      <p>
+        이 창에 이미지 파일을 <b>끌어다 놓거나</b>, 위의 <b>[이미지 열기]</b>를 누르거나,<br>
+        복사한 이미지를 <kbd>Ctrl</kbd> + <kbd>V</kbd> 로 <b>붙여넣으면</b> 시작됩니다.
+      </p>
+      <div class="samplerow">
+        <button id="btnSampleCat">🐱 예시: 고양이 픽셀아트</button>
+        <button id="btnSamplePhoto">🌻 예시: 해바라기 그림</button>
+      </div>
+    </div>
+
+    <div id="hintbar"></div>
+  </div>
+
+  <aside>
+    <div class="card" id="imgcard">
+      <h2>이미지 정보</h2>
+      <div id="imginfo" class="empty-msg">아직 불러온 이미지가 없어요</div>
+    </div>
+
+    <div class="card" id="pixelcard">
+      <h2 id="pixeltitle">픽셀 정보</h2>
+      <div id="pixelbody" style="display:none;">
+        <div class="swatchrow">
+          <div id="swatch"></div>
+          <div class="coords">
+            <div class="xy" id="coordText">(0, 0)</div>
+            <div class="note">왼쪽 위 픽셀이 (0, 0)</div>
+          </div>
+        </div>
+        <div class="chan r"><span class="name">R</span><div class="track"><div class="fill" id="fillR"></div></div><span class="val" id="valR">0</span></div>
+        <div class="chan g"><span class="name">G</span><div class="track"><div class="fill" id="fillG"></div></div><span class="val" id="valG">0</span></div>
+        <div class="chan b"><span class="name">B</span><div class="track"><div class="fill" id="fillB"></div></div><span class="val" id="valB">0</span></div>
+        <div id="alpharow">투명도(알파): <b id="valA">255</b></div>
+        <button id="hexchip" title="누르면 색상 코드가 복사됩니다">#000000</button>
+        <div id="pinstate">픽셀을 <b>클릭</b>하면 정보가 고정됩니다</div>
+      </div>
+      <div id="pixelempty" class="empty-msg">이미지 위에 마우스를 올리면<br>그 픽셀의 색 정보가 나타나요</div>
+    </div>
+
+    <div class="card tipcard">
+      <h2>💡 알아보기</h2>
+      <p>디지털 이미지는 <b>화소(픽셀)</b>라는 작은 사각형 점들로 이루어져 있어요.
+      각 픽셀의 색은 빨강(R)·초록(G)·파랑(B) 빛의 세기를 <b>0~255</b> 사이의 수로 나타내요.
+      마우스 휠을 굴려서 사진 속으로 깊이 들어가 보세요!</p>
+    </div>
+  </aside>
+</main>
+
+<div id="dragveil">이미지를 여기에 놓으세요</div>
+<input type="file" id="fileInput" accept="image/*" hidden>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const canvas = $("canvas"), ctx = canvas.getContext("2d");
+  const stage = $("stage");
+
+  // ---------- 상태 ----------
+  let imgCanvas = null;      // 원본 이미지가 그려진 오프스크린 캔버스
+  let imgData = null;        // 픽셀 데이터
+  let imgW = 0, imgH = 0, imgName = "";
+  let scale = 1;             // 이미지 1픽셀당 화면 px
+  let offX = 0, offY = 0;    // 이미지 (0,0)의 화면 좌표
+  const MAX_SCALE = 80, MIN_SCALE = 0.02;
+  let hover = null;          // {x,y} 마우스가 가리키는 픽셀
+  let pinned = null;         // {x,y} 클릭으로 고정한 픽셀
+  let showGrid = true;
+
+  // ---------- 캔버스 크기 ----------
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    draw();
+  }
+  new ResizeObserver(resizeCanvas).observe(stage);
+
+  // ---------- 그리기 ----------
+  let checker = null;
+  function makeChecker(){
+    const c = document.createElement("canvas"); c.width = c.height = 16;
+    const g = c.getContext("2d");
+    g.fillStyle = "#ffffff"; g.fillRect(0,0,16,16);
+    g.fillStyle = "#dde3ec"; g.fillRect(0,0,8,8); g.fillRect(8,8,8,8);
+    checker = ctx.createPattern(c, "repeat");
+  }
+  makeChecker();
+
+  function draw(){
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr, h = canvas.height / dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    if(!imgCanvas) return;
+
+    const dw = imgW * scale, dh = imgH * scale;
+    // 투명 배경용 체크무늬
+    ctx.fillStyle = checker;
+    ctx.fillRect(offX, offY, dw, dh);
+    // 이미지 (계단 현상 그대로 = 픽셀이 또렷하게)
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(imgCanvas, offX, offY, dw, dh);
+    // 이미지 테두리
+    ctx.strokeStyle = "rgba(29,36,51,.35)"; ctx.lineWidth = 1;
+    ctx.strokeRect(offX - .5, offY - .5, dw + 1, dh + 1);
+
+    // 격자
+    if(showGrid && scale >= 7){
+      ctx.beginPath();
+      const x0 = Math.max(0, Math.floor((0 - offX) / scale));
+      const x1 = Math.min(imgW, Math.ceil((w - offX) / scale));
+      const y0 = Math.max(0, Math.floor((0 - offY) / scale));
+      const y1 = Math.min(imgH, Math.ceil((h - offY) / scale));
+      for(let x = x0; x <= x1; x++){
+        const sx = Math.round(offX + x * scale) + .5;
+        ctx.moveTo(sx, Math.max(0, offY)); ctx.lineTo(sx, Math.min(h, offY + dh));
+      }
+      for(let y = y0; y <= y1; y++){
+        const sy = Math.round(offY + y * scale) + .5;
+        ctx.moveTo(Math.max(0, offX), sy); ctx.lineTo(Math.min(w, offX + dw), sy);
+      }
+      ctx.strokeStyle = scale >= 20 ? "rgba(29,36,51,.28)" : "rgba(29,36,51,.15)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    // 픽셀 강조 상자
+    const box = (p, color, lw) => {
+      if(!p) return;
+      ctx.strokeStyle = color; ctx.lineWidth = lw;
+      ctx.strokeRect(offX + p.x * scale - lw/2, offY + p.y * scale - lw/2, scale + lw, scale + lw);
+    };
+    if(hover && (!pinned || hover.x !== pinned.x || hover.y !== pinned.y) && scale >= 3)
+      box(hover, "rgba(62,99,221,.85)", 2);
+    if(pinned){
+      box(pinned, "#ffffff", 4);
+      box(pinned, "#3e63dd", 2);
+    }
+  }
+
+  // ---------- 정보 패널 ----------
+  function pixelAt(x, y){
+    const i = (y * imgW + x) * 4, d = imgData.data;
+    return [d[i], d[i+1], d[i+2], d[i+3]];
+  }
+  const hex2 = n => n.toString(16).toUpperCase().padStart(2, "0");
+
+  function updatePanel(){
+    const p = pinned || hover;
+    const body = $("pixelbody"), empty = $("pixelempty");
+    $("pixelcard").classList.toggle("pinned", !!pinned);
+    $("pixeltitle").textContent = pinned ? "픽셀 정보 · 📌 고정됨" : "픽셀 정보";
+    if(!p || !imgData){ body.style.display = "none"; empty.style.display = "block"; return; }
+    body.style.display = "block"; empty.style.display = "none";
+
+    const [r,g,b,a] = pixelAt(p.x, p.y);
+    $("coordText").textContent = `(${p.x}, ${p.y})`;
+    $("swatch").style.setProperty("--swatch-color", `rgba(${r},${g},${b},${a/255})`);
+    $("fillR").style.width = (r/255*100) + "%"; $("valR").textContent = r;
+    $("fillG").style.width = (g/255*100) + "%"; $("valG").textContent = g;
+    $("fillB").style.width = (b/255*100) + "%"; $("valB").textContent = b;
+    $("alpharow").style.display = a < 255 ? "block" : "none"; $("valA").textContent = a;
+    $("hexchip").textContent = "#" + hex2(r) + hex2(g) + hex2(b);
+    const pin = $("pinstate");
+    pin.classList.toggle("on", !!pinned);
+    pin.innerHTML = pinned ? "📌 고정 중 · 다시 클릭하거나 빈 곳을 클릭하면 해제" : "픽셀을 <b>클릭</b>하면 정보가 고정됩니다";
+  }
+
+  $("hexchip").addEventListener("click", () => {
+    const t = $("hexchip").textContent;
+    navigator.clipboard?.writeText(t).then(() => showHint(`색상 코드 ${t} 복사됨!`)).catch(()=>{});
+  });
+
+  // ---------- 확대/축소 & 이동 ----------
+  function setZoomLabel(){
+    $("zoomLabel").textContent = !imgCanvas ? "–" :
+      (scale >= 1 ? "×" + (Math.round(scale*10)/10) : Math.round(scale*100) + "%");
+  }
+  function clampOffsets(){
+    const w = canvas.width/(window.devicePixelRatio||1), h = canvas.height/(window.devicePixelRatio||1);
+    const dw = imgW*scale, dh = imgH*scale, m = 60; // 최소한 m px는 화면 안에
+    offX = Math.min(Math.max(offX, m - dw), w - m);
+    offY = Math.min(Math.max(offY, m - dh), h - m);
+  }
+  function zoomAt(cx, cy, factor){
+    if(!imgCanvas) return;
+    const ns = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale * factor));
+    offX = cx - (cx - offX) * (ns / scale);
+    offY = cy - (cy - offY) * (ns / scale);
+    scale = ns;
+    clampOffsets(); setZoomLabel(); draw();
+  }
+  function fit(){
+    if(!imgCanvas) return;
+    const w = canvas.width/(window.devicePixelRatio||1), h = canvas.height/(window.devicePixelRatio||1);
+    scale = Math.min((w-40)/imgW, (h-40)/imgH);
+    scale = Math.min(scale, MAX_SCALE);
+    offX = (w - imgW*scale)/2; offY = (h - imgH*scale)/2;
+    setZoomLabel(); draw();
+  }
+  function zoomToPixels(){
+    if(!imgCanvas) return;
+    const w = canvas.width/(window.devicePixelRatio||1), h = canvas.height/(window.devicePixelRatio||1);
+    // 화면 중앙이 가리키는 이미지 지점을 유지하며 24배로
+    const cx = w/2, cy = h/2;
+    const ix = (cx - offX)/scale, iy = (cy - offY)/scale;
+    scale = Math.max(scale, 24); scale = Math.min(scale, MAX_SCALE);
+    offX = cx - ix*scale; offY = cy - iy*scale;
+    clampOffsets(); setZoomLabel(); draw();
+    showHint("확대되었어요! 마우스를 올려 픽셀 색을 확인해 보세요");
+  }
+
+  canvas.addEventListener("wheel", e => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.18 : 1/1.18);
+  }, {passive:false});
+
+  $("btnZoomIn").addEventListener("click", () => centerZoom(1.5));
+  $("btnZoomOut").addEventListener("click", () => centerZoom(1/1.5));
+  function centerZoom(f){
+    const w = canvas.width/(window.devicePixelRatio||1), h = canvas.height/(window.devicePixelRatio||1);
+    zoomAt(w/2, h/2, f);
+  }
+  $("btnFit").addEventListener("click", fit);
+  $("btnPixel").addEventListener("click", zoomToPixels);
+  $("chkGrid").addEventListener("change", e => { showGrid = e.target.checked; draw(); });
+
+  // 포인터: 드래그 이동 / 클릭 고정 / 핀치 줌
+  const pointers = new Map();
+  let dragStart = null, moved = false, pinchDist = 0;
+
+  canvas.addEventListener("pointerdown", e => {
+    canvas.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, {x:e.offsetX, y:e.offsetY});
+    if(pointers.size === 1){ dragStart = {x:e.offsetX, y:e.offsetY, ox:offX, oy:offY}; moved = false; }
+    if(pointers.size === 2){
+      const [a,b] = [...pointers.values()];
+      pinchDist = Math.hypot(a.x-b.x, a.y-b.y);
+    }
+    canvas.classList.add("grabbing");
+  });
+  canvas.addEventListener("pointermove", e => {
+    if(pointers.has(e.pointerId)) pointers.set(e.pointerId, {x:e.offsetX, y:e.offsetY});
+    if(pointers.size === 2){
+      const [a,b] = [...pointers.values()];
+      const d = Math.hypot(a.x-b.x, a.y-b.y);
+      if(pinchDist > 0){ zoomAt((a.x+b.x)/2, (a.y+b.y)/2, d/pinchDist); }
+      pinchDist = d; moved = true;
+      return;
+    }
+    if(dragStart && pointers.size === 1){
+      const dx = e.offsetX - dragStart.x, dy = e.offsetY - dragStart.y;
+      if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      if(moved){ offX = dragStart.ox + dx; offY = dragStart.oy + dy; clampOffsets(); }
+    }
+    // 호버 픽셀 추적
+    if(imgCanvas){
+      const ix = Math.floor((e.offsetX - offX)/scale), iy = Math.floor((e.offsetY - offY)/scale);
+      hover = (ix >= 0 && iy >= 0 && ix < imgW && iy < imgH) ? {x:ix, y:iy} : null;
+      canvas.classList.toggle("picking", !!hover && !dragStart);
+      if(!pinned) updatePanel();
+    }
+    draw();
+  });
+  function endPointer(e){
+    pointers.delete(e.pointerId);
+    canvas.classList.remove("grabbing");
+    if(pointers.size < 2) pinchDist = 0;
+    if(dragStart && !moved && imgCanvas){
+      // 클릭: 픽셀 고정/해제
+      const ix = Math.floor((e.offsetX - offX)/scale), iy = Math.floor((e.offsetY - offY)/scale);
+      if(ix >= 0 && iy >= 0 && ix < imgW && iy < imgH){
+        pinned = (pinned && pinned.x === ix && pinned.y === iy) ? null : {x:ix, y:iy};
+      } else pinned = null;
+      updatePanel(); draw();
+    }
+    if(pointers.size === 0) dragStart = null;
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+  canvas.addEventListener("pointerleave", () => { hover = null; if(!pinned) updatePanel(); draw(); });
+
+  // ---------- 힌트 바 ----------
+  let hintTimer = null;
+  function showHint(text, ms = 2600){
+    const bar = $("hintbar");
+    bar.textContent = text; bar.classList.add("show");
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => bar.classList.remove("show"), ms);
+  }
+
+  // ---------- 이미지 불러오기 ----------
+  function loadFromSource(source, name){
+    const img = new Image();
+    img.onload = () => {
+      imgW = img.naturalWidth; imgH = img.naturalHeight; imgName = name || "";
+      imgCanvas = document.createElement("canvas");
+      imgCanvas.width = imgW; imgCanvas.height = imgH;
+      const g = imgCanvas.getContext("2d", {willReadFrequently:true});
+      g.drawImage(img, 0, 0);
+      imgData = g.getImageData(0, 0, imgW, imgH);
+      pinned = null; hover = null;
+      $("dropzone").classList.add("hidden");
+      $("imginfo").className = "";
+      $("imginfo").innerHTML =
+        (imgName ? `<div style="word-break:break-all; font-size:13px; color:var(--sub); margin-bottom:4px;">${imgName.replace(/</g,"&lt;")}</div>` : "") +
+        `가로 <b>${imgW.toLocaleString()}</b> × 세로 <b>${imgH.toLocaleString()}</b> 화소<br>` +
+        `모두 <b>${(imgW*imgH).toLocaleString()}</b>개의 픽셀`;
+      fit(); updatePanel();
+      showHint("🖱️ 휠을 굴려 확대 · 드래그로 이동 · 픽셀을 클릭하면 고정", 4200);
+      if(source.startsWith("blob:")) URL.revokeObjectURL(source);
+    };
+    img.onerror = () => showHint("이미지를 읽지 못했어요. 다른 파일로 시도해 주세요");
+    img.src = source;
+  }
+  function loadFile(file){
+    if(!file || !file.type.startsWith("image/")){ showHint("이미지 파일만 열 수 있어요"); return; }
+    loadFromSource(URL.createObjectURL(file), file.name);
+  }
+
+  // 파일 선택
+  $("btnOpen").addEventListener("click", () => $("fileInput").click());
+  $("fileInput").addEventListener("change", e => { loadFile(e.target.files[0]); e.target.value = ""; });
+
+  // 드래그 & 드롭
+  let dragDepth = 0;
+  window.addEventListener("dragenter", e => {
+    e.preventDefault(); dragDepth++;
+    $("dragveil").classList.add("on"); $("dropzone").classList.add("dragover");
+  });
+  window.addEventListener("dragover", e => e.preventDefault());
+  window.addEventListener("dragleave", e => {
+    e.preventDefault(); dragDepth = Math.max(0, dragDepth - 1);
+    if(dragDepth === 0){ $("dragveil").classList.remove("on"); $("dropzone").classList.remove("dragover"); }
+  });
+  window.addEventListener("drop", e => {
+    e.preventDefault(); dragDepth = 0;
+    $("dragveil").classList.remove("on"); $("dropzone").classList.remove("dragover");
+    const f = [...(e.dataTransfer.files || [])].find(f => f.type.startsWith("image/"));
+    if(f) loadFile(f); else showHint("이미지 파일을 찾지 못했어요");
+  });
+
+  // 붙여넣기 (Ctrl+V)
+  window.addEventListener("paste", e => {
+    const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+    if(item){ loadFile(item.getAsFile()); }
+  });
+  // 붙여넣기 버튼 (클립보드 읽기 권한 필요)
+  $("btnPaste").addEventListener("click", async () => {
+    try{
+      const items = await navigator.clipboard.read();
+      for(const it of items){
+        const type = it.types.find(t => t.startsWith("image/"));
+        if(type){
+          const blob = await it.getType(type);
+          loadFromSource(URL.createObjectURL(blob), "붙여넣은 이미지");
+          return;
+        }
+      }
+      showHint("클립보드에 이미지가 없어요. 먼저 이미지를 복사해 주세요");
+    }catch(err){
+      showHint("이 창을 클릭한 뒤 Ctrl+V 를 눌러 붙여넣어 주세요");
+    }
+  });
+
+  // ---------- 예시 이미지 ----------
+  function loadFromCanvas(c, name){
+    loadFromSource(c.toDataURL("image/png"), name);
+  }
+  $("btnSampleCat").addEventListener("click", () => {
+    const P = { ".":null, "#":"#22212b", "o":"#f5a83c", "w":"#fff4e0", "p":"#f06d8f", "y":"#ffd94a" };
+    const rows = [
+      "..#.........#...",
+      ".#o#.......#o#..",
+      ".#oo#######oo#..",
+      ".#ooooooooooo#..",
+      "#ooooooooooooo#.",
+      "#oo##ooooo##oo#.",
+      "#oo##ooooo##oo#.",
+      "#ooooooooooooo#.",
+      "#oooooypyooooo#.",
+      "#ooooooyoooooo#.",
+      ".#ooooooooooo#..",
+      ".#owwwwwwwwwo#..",
+      "..#owwwwwwwo#...",
+      "...##ooooo##....",
+      ".....#####......",
+      "................"
+    ];
+    const c = document.createElement("canvas"); c.width = 16; c.height = 16;
+    const g = c.getContext("2d");
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      if(P[ch]){ g.fillStyle = P[ch]; g.fillRect(x, y, 1, 1); }
+    }));
+    loadFromCanvas(c, "예시 · 고양이 픽셀아트 (16×16)");
+  });
+
+  $("btnSamplePhoto").addEventListener("click", () => {
+    const W = 96, H = 64;
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const g = c.getContext("2d");
+    // 하늘
+    const sky = g.createLinearGradient(0, 0, 0, H*0.72);
+    sky.addColorStop(0, "#6fb3ef"); sky.addColorStop(1, "#cfe8fb");
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    // 땅
+    const ground = g.createLinearGradient(0, H*0.68, 0, H);
+    ground.addColorStop(0, "#7cbf5a"); ground.addColorStop(1, "#3f8a3c");
+    g.fillStyle = ground; g.fillRect(0, H*0.68, W, H);
+    // 구름
+    g.fillStyle = "rgba(255,255,255,.9)";
+    [[16,10,7],[24,12,9],[33,10,6],[70,17,6],[77,18,8]].forEach(([x,y,r]) => {
+      g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    });
+    // 해바라기: 줄기
+    g.fillStyle = "#3d7a33"; g.fillRect(46, 38, 3, 20);
+    // 꽃잎
+    g.fillStyle = "#ffcf2e";
+    for(let i = 0; i < 14; i++){
+      const a = i/14*Math.PI*2;
+      g.beginPath(); g.ellipse(47.5+Math.cos(a)*11, 30+Math.sin(a)*11, 5, 3.4, a, 0, 7); g.fill();
+    }
+    g.fillStyle = "#ffb31f";
+    for(let i = 0; i < 14; i++){
+      const a = (i+.5)/14*Math.PI*2;
+      g.beginPath(); g.ellipse(47.5+Math.cos(a)*9, 30+Math.sin(a)*9, 4.4, 3, a, 0, 7); g.fill();
+    }
+    // 중심
+    g.fillStyle = "#7a4a20"; g.beginPath(); g.arc(47.5, 30, 7, 0, 7); g.fill();
+    g.fillStyle = "#5d3413"; g.beginPath(); g.arc(47.5, 30, 4.5, 0, 7); g.fill();
+    // 잎
+    g.fillStyle = "#4c9440";
+    g.beginPath(); g.ellipse(41, 46, 6, 3, -.6, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(54, 50, 6, 3, .6, 0, 7); g.fill();
+    loadFromCanvas(c, "예시 · 해바라기 그림 (96×64)");
+  });
+
+  // 초기화
+  resizeCanvas(); setZoomLabel();
+})();
+</script>
+</body>
+</html>

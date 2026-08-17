@@ -1,0 +1,11 @@
+# 교과서 원본 PDF — 저작권 자료이므로 저장소에 올리지 않는다
+*.pdf
+
+# 변환 전 원본 HTML 백업
+_원본/
+
+# 윈도/OneDrive 부산물
+desktop.ini
+Thumbs.db
+.DS_Store
+*.tmp

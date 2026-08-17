@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>점·선·면 탐구실</title>
+<link rel="stylesheet" href="../assets/common.css">
+<script src="../assets/common.js" data-home="../index.html" defer></script>
+<script>
+window.MathJax = {
+  tex:{ inlineMath:[["\\(","\\)"]] },
+  svg:{ fontCache:"global" },
+  options:{ enableMenu:false }
+};
+</script>
+<script src="../assets/vendor/tex-svg.js"></script>
+<script src="../assets/vendor/three.min.js"></script>
+<style>
+  :root{
+    --bg:#f2f5fa; --panel:#fff; --line:#e2e7f0; --ink:#1d2433; --sub:#68738a;
+    --blue:#3e63dd; --blue-soft:#eef2ff; --green:#2f9e63; --orange:#f5820b;
+    --red:#e5484d; --purple:#8e4ec6;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%; overflow:hidden;}
+  body{
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    background:var(--bg); color:var(--ink);
+  }
+  #app{height:100%; display:flex; flex-direction:column;}
+
+  header{
+    display:flex; align-items:center; gap:20px; padding:0 18px; height:52px; flex:none;
+    background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:17px; font-weight:800; white-space:nowrap;}
+  nav{display:flex; gap:6px; height:100%;}
+  nav button{
+    font:inherit; font-size:14.5px; font-weight:700; border:none; background:none; color:var(--sub);
+    padding:0 16px; cursor:pointer; border-bottom:3px solid transparent; height:100%;
+  }
+  nav button:hover{background:#f2f5fb;}
+  nav button.on{color:var(--blue); border-bottom-color:var(--blue); background:var(--blue-soft);}
+
+  main{flex:1; min-height:0; padding:10px 12px 12px;}
+  section{display:none; height:100%;}
+  section.on{display:flex; gap:10px;}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+    display:flex; flex-direction:column; min-width:0; min-height:0;}
+  .acttitle{font-size:15px; font-weight:800; margin-bottom:2px; flex:none;}
+  .acttitle .no{color:#fff; background:var(--blue); border-radius:7px; padding:2px 8px; font-size:12px; margin-right:6px;}
+  .hint{font-size:12.5px; color:var(--sub); line-height:1.5; flex:none;}
+  .btn{
+    font:inherit; font-size:13.5px; border:1px solid var(--line); background:#fff; color:var(--ink);
+    padding:7px 12px; border-radius:9px; cursor:pointer; user-select:none;
+  }
+  .btn:hover{background:#f2f5fb;}
+  .btn.primary{background:var(--blue); border-color:var(--blue); color:#fff; font-weight:700;}
+  .btn.primary:hover{background:#3357c8;}
+  .btn.sel{background:var(--blue-soft); border-color:var(--blue); color:var(--blue); font-weight:700;}
+  .row{display:flex; gap:6px; flex-wrap:wrap; align-items:center; flex:none;}
+  .feedback{font-size:13.5px; font-weight:700; line-height:1.55; flex:none;}
+  .feedback.ok{color:var(--green);} .feedback.no{color:var(--red);}
+  .feedback.info{color:var(--sub); font-weight:500;}
+  input[type=number]{
+    font:inherit; width:64px; padding:6px 8px; border:1.5px solid var(--line); border-radius:8px;
+    font-size:14px; text-align:center;
+  }
+  input.good{border-color:var(--green); background:#effaf3;}
+  input.bad{border-color:var(--red); background:#fdf0f0;}
+  canvas.flat{display:block; width:100%; height:100%; border-radius:10px; background:#fdfefe;
+    border:1px solid var(--line); touch-action:none;}
+  .cvwrap{flex:1; min-height:0; position:relative;}
+  mjx-container{margin:0 2px !important;}
+
+  /* ---------- 탭1 ---------- */
+  .stagecol{flex:1; min-width:0; display:flex; flex-direction:column;}
+  #stage3d{flex:1; min-height:0; border-radius:14px; background:linear-gradient(180deg,#eef3fb,#dde6f3);
+    border:1px solid var(--line); touch-action:none; cursor:grab; overflow:hidden; position:relative;}
+  #stage3d.grabbing{cursor:grabbing;}
+  #rotateHint{position:absolute; left:50%; bottom:10px; transform:translateX(-50%); font-size:12px;
+    background:rgba(29,36,51,.75); color:#fff; padding:5px 12px; border-radius:99px; pointer-events:none; z-index:5;}
+  #side1{width:330px; flex:none; display:flex; flex-direction:column; gap:8px; overflow-y:auto;}
+  .sblock{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px; flex:none;}
+  .sblock .sh{font-size:12px; font-weight:800; color:var(--sub); letter-spacing:.03em; margin-bottom:7px;}
+  .counters{display:flex; gap:8px; margin:8px 0;}
+  .counter{flex:1; border:1.5px solid var(--line); border-radius:10px; padding:6px 10px; text-align:center;}
+  .counter .num{font-size:22px; font-weight:800;}
+  .counter.vc{border-color:#f3b6b8;} .counter.vc .num{color:var(--red);}
+  .counter.ec{border-color:#f8cf9a;} .counter.ec .num{color:var(--orange);}
+  .counter .lab{font-size:11.5px; color:var(--sub);}
+  .legend{display:flex; gap:12px; font-size:12px; color:var(--sub); margin-top:6px;}
+  .dotmark{display:inline-block; width:10px; height:10px; border-radius:50%; vertical-align:-1px; margin-right:3px;}
+  #tiltWrap{margin:6px 0 2px;}
+  #tiltWrap label{font-size:12.5px; color:var(--sub); font-weight:700;}
+  #tiltSlider{width:100%; accent-color:var(--blue); cursor:pointer;}
+  .conceptNote{font-size:12px; color:var(--sub); line-height:1.6; padding:2px 4px;}
+
+  /* ---------- 탭2 ---------- */
+  #t2 .half{flex:1;}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 8px; flex:none;}
+  .chip{
+    font:inherit; font-size:13px; font-weight:700; border:2px solid var(--line); background:#fff;
+    padding:5px 11px; border-radius:99px; cursor:pointer; color:var(--sub);
+    display:inline-flex; align-items:center; gap:5px;
+  }
+  .chip .sw{width:10px; height:10px; border-radius:3px;}
+  .chip.on{color:var(--ink);}
+  .chip.on.c-line{border-color:var(--blue); background:var(--blue-soft);}
+  .chip.on.c-rayab{border-color:var(--green); background:#effaf3;}
+  .chip.on.c-rayba{border-color:var(--orange); background:#fff6ea;}
+  .chip.on.c-seg{border-color:var(--purple); background:#f7f1fc;}
+  #fb2compare{min-height:44px; margin-top:8px;}
+  #cvqwrap{height:132px; flex:none;}
+  .choices{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; flex:none;}
+  .choices button{
+    font:inherit; font-size:14px; padding:10px 6px; border:2px solid var(--line); border-radius:11px;
+    background:#fff; cursor:pointer; font-weight:700;
+  }
+  .choices button:hover{border-color:var(--blue);}
+  .choices button.correct{border-color:var(--green); background:#effaf3;}
+  .choices button.wrong{border-color:var(--red); background:#fdf0f0;}
+  .score{font-size:13px; font-weight:800; color:var(--blue);}
+  #fbq{min-height:40px; margin-top:8px;}
+
+  /* ---------- 탭3 ---------- */
+  #t3 .third{flex:1;}
+  #cv3bwrap{height:158px; flex:none;}
+  #cv3cwrap{height:104px; flex:none;}
+  .qline{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:14px; margin:8px 0; flex:none;}
+  #fb3a{min-height:58px; margin-top:6px; font-weight:500; font-size:13px;}
+  #fb3b{min-height:38px; margin-top:6px;}
+  #fb3c{min-height:38px; margin-top:6px;}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <h1>📐 점·선·면 탐구실</h1>
+  <nav>
+    <button class="on" data-tab="t1">🧊 ① 교점과 교선</button>
+    <button data-tab="t2">📏 ② 직선·반직선·선분</button>
+    <button data-tab="t3">📍 ③ 두 점 사이의 거리</button>
+  </nav>
+  <a class="home-btn" href="../index.html">← 목차</a>
+</header>
+
+<main>
+<!-- ================= 탭 1 ================= -->
+<section id="t1" class="on">
+  <div class="stagecol">
+    <div id="stage3d"><div id="rotateHint">🖱️ 빈 곳 드래그: 회전 · 휠: 확대/축소</div></div>
+  </div>
+  <aside id="side1">
+    <div class="sblock">
+      <div class="sh">개념 보기 — 직접 움직여 보세요</div>
+      <div class="row">
+        <button class="btn shapeBtn" data-shape="demoLL">선과 선</button>
+        <button class="btn shapeBtn" data-shape="demoLP">선과 면</button>
+        <button class="btn shapeBtn" data-shape="demoPP">면과 면</button>
+      </div>
+    </div>
+    <div class="sblock">
+      <div class="sh">개수 세기 도전</div>
+      <div class="row">
+        <button class="btn shapeBtn sel" data-shape="cube">직육면체</button>
+        <button class="btn shapeBtn" data-shape="tetra">삼각뿔</button>
+        <button class="btn shapeBtn" data-shape="pyr4">사각뿔</button>
+        <button class="btn shapeBtn" data-shape="prism3">삼각기둥</button>
+        <button class="btn shapeBtn" data-shape="cyl">원기둥</button>
+      </div>
+    </div>
+
+    <div class="sblock" id="demoCtl" style="display:none;">
+      <div class="sh" id="demoName"></div>
+      <div class="feedback" id="demoFb"></div>
+    </div>
+
+    <div class="sblock" id="countCtl">
+      <div class="sh">도형 위의 교점·교선을 클릭해서 모두 찾아보세요!</div>
+      <div class="counters">
+        <div class="counter vc"><div class="num" id="vCount">0</div><div class="lab">찾은 교점</div></div>
+        <div class="counter ec"><div class="num" id="eCount">0</div><div class="lab">찾은 교선</div></div>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="btnCheck3d">✅ 정답 확인</button>
+        <button class="btn" id="btnReveal3d">💡 모두 표시</button>
+        <button class="btn" id="btnClear3d">🧹 다시</button>
+      </div>
+      <div class="feedback" id="fb3d" style="margin-top:8px; min-height:38px;"></div>
+      <div class="legend">
+        <span><span class="dotmark" style="background:var(--red);"></span>교점</span>
+        <span><span class="dotmark" style="background:var(--orange);"></span>교선</span>
+      </div>
+    </div>
+    <div class="conceptNote">💡 선과 선·선과 면이 만나면 <b style="color:var(--red);">교점</b>,
+      면과 면이 만나면 <b style="color:var(--orange);">교선</b>이 생겨요. 점·선·면은 도형의 기본 요소!</div>
+  </aside>
+</section>
+
+<!-- ================= 탭 2 ================= -->
+<section id="t2">
+  <div class="card half">
+    <div class="acttitle"><span class="no">활동 1</span>겹쳐 보며 비교하기</div>
+    <div class="hint">버튼으로 도형을 켜고 끄면서 비교해 보세요. 점 \(A\), \(B\)는 드래그해서 움직일 수 있어요.</div>
+    <div class="chips">
+      <button class="chip c-line" data-k="line"><span class="sw" style="background:var(--blue);"></span>직선 \(\overleftrightarrow{AB}\)</button>
+      <button class="chip c-rayab" data-k="rayab"><span class="sw" style="background:var(--green);"></span>반직선 \(\overrightarrow{AB}\)</button>
+      <button class="chip c-rayba" data-k="rayba"><span class="sw" style="background:var(--orange);"></span>반직선 \(\overrightarrow{BA}\)</button>
+      <button class="chip c-seg" data-k="seg"><span class="sw" style="background:var(--purple);"></span>선분 \(\overline{AB}\)</button>
+    </div>
+    <div class="cvwrap"><canvas id="cv2" class="flat"></canvas></div>
+    <div class="feedback info" id="fb2compare">위의 버튼을 눌러 도형을 나타내 보세요.</div>
+  </div>
+
+  <div class="card half">
+    <div class="acttitle"><span class="no">활동 2</span>기호 맞히기 퀴즈 <span class="score" id="score2"></span></div>
+    <div class="hint">한 직선 위에 세 점 \(A\), \(B\), \(C\)가 있어요. <b style="color:var(--red);">빨간색 도형</b>을 나타내는 기호를 고르세요.</div>
+    <div id="cvqwrap" style="margin-top:8px;"><canvas id="cvq" class="flat"></canvas></div>
+    <div class="choices" id="choices"></div>
+    <div class="feedback" id="fbq"></div>
+    <div class="row" style="margin-top:auto; padding-top:8px;"><button class="btn primary" id="btnNextQ">다음 문제 ▶</button></div>
+  </div>
+</section>
+
+<!-- ================= 탭 3 ================= -->
+<section id="t3">
+  <div class="card third">
+    <div class="acttitle"><span class="no">활동 1</span>선분보다 짧은 길을 그릴 수 있을까?</div>
+    <div class="hint">점 \(A\)를 잡고 \(B\)까지 길을 그려 보세요. 선분보다 짧게 그리기에 도전!</div>
+    <div class="cvwrap" style="margin-top:8px;"><canvas id="cv3a" class="flat"></canvas></div>
+    <div class="feedback info" id="fb3a">🖊️ \(A\)에 대고 누른 채로 \(B\)까지 그린 뒤 손을 떼면 길이가 측정돼요.</div>
+    <div class="row" style="padding-top:6px;"><button class="btn" id="btnClearPath">🧹 다시 그리기</button></div>
+  </div>
+
+  <div class="card third">
+    <div class="acttitle"><span class="no">활동 2</span>중점을 찾아라!</div>
+    <div class="hint" id="hint3b">파란 점 \(M\)을 드래그해서 \(\overline{AM}=\overline{MB}\)가 되는 자리(중점)에 놓아 보세요.</div>
+    <div id="cv3bwrap" style="margin-top:8px;"><canvas id="cv3b" class="flat"></canvas></div>
+    <div class="feedback" id="fb3b"></div>
+    <div class="row" style="margin-top:auto; padding-top:6px;">
+      <button class="btn" id="btnNewMid">🔄 새 문제</button>
+      <button class="btn primary" id="btnStageN" style="display:none;">심화 ▶ \(\overline{MB}\)의 중점 \(N\) 찾기</button>
+    </div>
+    <div class="conceptNote" style="margin-top:6px;">두 점을 잇는 가장 짧은 선 = 선분 → 그 길이가 <b>두 점 사이의 거리</b>.
+      중점 \(M\)은 \(\overline{AM}=\overline{BM}=\frac{1}{2}\overline{AB}\)</div>
+  </div>
+
+  <div class="card third">
+    <div class="acttitle"><span class="no">활동 3</span>계산 도전 <span class="score" id="score3"></span></div>
+    <div class="hint">점 \(M\)은 \(\overline{AB}\)의 중점, 점 \(N\)은 \(\overline{MB}\)의 중점이에요.</div>
+    <div id="cv3cwrap" style="margin-top:8px;"><canvas id="cv3c" class="flat"></canvas></div>
+    <div class="qline">\(\overline{AM}=\) <input type="number" id="inAM"> cm</div>
+    <div class="qline">\(\overline{MN}=\) <input type="number" id="inMN"> cm</div>
+    <div class="qline">\(\overline{NB}=\) <input type="number" id="inNB"> cm</div>
+    <div class="row">
+      <button class="btn primary" id="btnCheckCalc">✅ 채점하기</button>
+      <button class="btn" id="btnNewCalc">🔄 새 문제</button>
+    </div>
+    <div class="feedback" id="fb3c"></div>
+  </div>
+</section>
+</main>
+</div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* MathJax 재조판 도우미 */
+function TS(el){
+  const mj = window.MathJax;
+  if(mj && mj.startup) mj.startup.promise.then(() => mj.typesetPromise([el]).catch(() => {}));
+}
+
+/* TeX 기호 도우미 */
+const tex = {
+  line: p => `\\(\\overleftrightarrow{${p}}\\)`,
+  ray:  p => `\\(\\overrightarrow{${p}}\\)`,
+  seg:  p => `\\(\\overline{${p}}\\)`
+};
+const symName = { line:"직선", ray:"반직선", seg:"선분" };
+
+/* 캔버스 수식 렌더링 (Times 계열 이탤릭 + 윗줄/화살표) */
+const MF = "'Times New Roman','STIXGeneral',serif";
+function mSegs(ctx, segs, size){
+  let w = 0;
+  for(const s of segs){
+    ctx.font = (s.v !== undefined ? `italic 700 ${size}px ${MF}` : `${size}px ${MF}`);
+    w += ctx.measureText(s.v !== undefined ? s.v : s.t).width;
+  }
+  return w;
+}
+function mDraw(ctx, x, y, segs, size = 15, color = "#1d2433"){
+  ctx.fillStyle = color; ctx.strokeStyle = color; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  let cx = x;
+  for(const s of segs){
+    if(s.v !== undefined){
+      ctx.font = `italic 700 ${size}px ${MF}`;
+      const w = ctx.measureText(s.v).width;
+      ctx.fillText(s.v, cx, y);
+      if(s.d){
+        const ty = y - size * 0.95;
+        ctx.lineWidth = Math.max(1.1, size/13);
+        ctx.beginPath(); ctx.moveTo(cx + 0.5, ty); ctx.lineTo(cx + w - 0.5, ty); ctx.stroke();
+        if(s.d === "rarr"){
+          ctx.beginPath(); ctx.moveTo(cx + w - 4.5, ty - 2.6); ctx.lineTo(cx + w, ty); ctx.lineTo(cx + w - 4.5, ty + 2.6); ctx.stroke();
+        }
+      }
+      cx += w;
+    } else {
+      ctx.font = `${size}px ${MF}`;
+      ctx.fillText(s.t, cx, y);
+      cx += ctx.measureText(s.t).width;
+    }
+  }
+  return cx - x;
+}
+function mDrawC(ctx, cx0, y, segs, size = 15, color = "#1d2433"){ // 가운데 정렬
+  const w = mSegs(ctx, segs, size);
+  return mDraw(ctx, cx0 - w/2, y, segs, size, color);
+}
+
+/* 탭 전환 */
+document.querySelectorAll("nav button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(x => x.classList.remove("on"));
+    document.querySelectorAll("main section").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    $(b.dataset.tab).classList.add("on");
+    window.dispatchEvent(new Event("resize"));
+  });
+});
+
+/* 캔버스 자동 크기 맞춤 */
+function autoFit(cv, draw){
+  const doFit = () => {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if(!w || !h) return;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.getContext("2d").setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  };
+  new ResizeObserver(doFit).observe(cv);
+  window.addEventListener("resize", doFit);
+  doFit();
+}
+
+/* ================================================================
+   1. 교점·교선 3D
+================================================================ */
+(() => {
+  const wrap = $("stage3d");
+  if(typeof THREE === "undefined"){
+    wrap.innerHTML = "<p style='padding:30px;text-align:center;color:#68738a;'>3D 모듈을 불러오지 못했어요. 파일이 손상되었을 수 있어요.</p>";
+    return;
+  }
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  wrap.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+  camera.position.set(0, 0.5, 6.4);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(3, 5, 4); scene.add(dl);
+  const group = new THREE.Group(); scene.add(group);
+
+  const C = { v:0x51607a, vOn:0xe5484d, e:0x9fb0c8, eOn:0xf5820b, face:0x7ec8f7 };
+  let hitTargets = [], totalV = 0, totalE = 0, mode = "solid", autoRotate = true;
+  const faceMat = (color = C.face, op = 0.32) => new THREE.MeshPhongMaterial({color, transparent:true, opacity:op, side:THREE.DoubleSide, depthWrite:false});
+
+  /* 격자 보드 텍스처 (평면 = 주어진 범위) */
+  function boardTexture(){
+    const c = document.createElement("canvas"); c.width = 460; c.height = 300;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fbfdff"; g.fillRect(0, 0, 460, 300);
+    g.strokeStyle = "#dbe4f2"; g.lineWidth = 1;
+    for(let x = 0; x <= 460; x += 30){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 300); g.stroke(); }
+    for(let y = 0; y <= 300; y += 30){ g.beginPath(); g.moveTo(0, y); g.lineTo(460, y); g.stroke(); }
+    g.strokeStyle = "#8b9cc0"; g.lineWidth = 5; g.strokeRect(0, 0, 460, 300);
+    const t = new THREE.CanvasTexture(c);
+    return t;
+  }
+
+  function clearGroup(){
+    while(group.children.length) group.remove(group.children[0]);
+    hitTargets = [];
+  }
+  function addVertex(p, clickable = true, parent = group, r = 0.13){
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 20), new THREE.MeshPhongMaterial({color:C.v}));
+    m.position.copy(p); m.userData = {kind:"v", marked:false};
+    parent.add(m);
+    if(clickable){
+      const hit = new THREE.Mesh(new THREE.SphereGeometry(r + 0.13, 8, 8), new THREE.MeshBasicMaterial({visible:false}));
+      hit.position.copy(p); hit.userData = {proxy:m}; parent.add(hit); hitTargets.push(hit);
+    }
+    return m;
+  }
+  function addEdge(a, b, clickable = true, r = 0.045, parent = group){
+    const dir = new THREE.Vector3().subVectors(b, a), len = dir.length();
+    const mk = rad => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, len, 10),
+        rad === r ? new THREE.MeshPhongMaterial({color:C.e}) : new THREE.MeshBasicMaterial({visible:false}));
+      m.position.copy(a).lerp(b, 0.5);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+      return m;
+    };
+    const vis = mk(r); vis.userData = {kind:"e", marked:false}; parent.add(vis);
+    if(clickable){ const hit = mk(0.16); hit.userData = {proxy:vis}; parent.add(hit); hitTargets.push(hit); }
+    return vis;
+  }
+  function addRim(y, R, clickable = true){
+    const vis = new THREE.Mesh(new THREE.TorusGeometry(R, 0.05, 10, 60), new THREE.MeshPhongMaterial({color:C.e}));
+    vis.rotation.x = Math.PI/2; vis.position.y = y; vis.userData = {kind:"e", marked:false};
+    group.add(vis);
+    if(clickable){
+      const hit = new THREE.Mesh(new THREE.TorusGeometry(R, 0.17, 8, 40), new THREE.MeshBasicMaterial({visible:false}));
+      hit.rotation.x = Math.PI/2; hit.position.y = y; hit.userData = {proxy:vis};
+      group.add(hit); hitTargets.push(hit);
+    }
+    return vis;
+  }
+  function markMesh(m, on){
+    m.userData.marked = on;
+    m.material.color.setHex(on ? (m.userData.kind === "v" ? C.vOn : C.eOn) : (m.userData.kind === "v" ? C.v : C.e));
+  }
+
+  const polyVerts = (n, R, y) => Array.from({length:n}, (_, i) => {
+    const t = i/n * Math.PI * 2;
+    return new THREE.Vector3(R*Math.sin(t), y, R*Math.cos(t));
+  });
+
+  /* ---------- 입체도형 (개수 세기) ---------- */
+  const solids = {
+    cube(){
+      const hw = 1.15, hh = 0.78, hd = 0.68, vs = [];
+      for(const x of [-hw, hw]) for(const y of [-hh, hh]) for(const z of [-hd, hd]) vs.push(new THREE.Vector3(x, y, z));
+      group.add(new THREE.Mesh(new THREE.BoxGeometry(hw*2, hh*2, hd*2), faceMat()));
+      vs.forEach(v => addVertex(v));
+      for(let i = 0; i < 8; i++) for(let j = i+1; j < 8; j++)
+        if(["x","y","z"].filter(k => vs[i][k] !== vs[j][k]).length === 1) addEdge(vs[i], vs[j]);
+      totalV = 8; totalE = 12;
+    },
+    tetra(){
+      const R = 1.35, h = 1.75, base = polyVerts(3, R, -h/2), apex = new THREE.Vector3(0, h/2, 0);
+      group.add(new THREE.Mesh(new THREE.ConeGeometry(R, h, 3), faceMat()));
+      [...base, apex].forEach(v => addVertex(v));
+      for(let i = 0; i < 3; i++){ addEdge(base[i], base[(i+1)%3]); addEdge(base[i], apex); }
+      totalV = 4; totalE = 6;
+    },
+    pyr4(){
+      const R = 1.35, h = 1.6, base = polyVerts(4, R, -h/2), apex = new THREE.Vector3(0, h/2, 0);
+      group.add(new THREE.Mesh(new THREE.ConeGeometry(R, h, 4), faceMat()));
+      [...base, apex].forEach(v => addVertex(v));
+      for(let i = 0; i < 4; i++){ addEdge(base[i], base[(i+1)%4]); addEdge(base[i], apex); }
+      totalV = 5; totalE = 8;
+    },
+    prism3(){
+      const R = 1.2, h = 1.7, top = polyVerts(3, R, h/2), bot = polyVerts(3, R, -h/2);
+      group.add(new THREE.Mesh(new THREE.CylinderGeometry(R, R, h, 3), faceMat()));
+      [...top, ...bot].forEach(v => addVertex(v));
+      for(let i = 0; i < 3; i++){ addEdge(top[i], top[(i+1)%3]); addEdge(bot[i], bot[(i+1)%3]); addEdge(top[i], bot[i]); }
+      totalV = 6; totalE = 9;
+    },
+    cyl(){
+      const R = 1.05, h = 1.7;
+      group.add(new THREE.Mesh(new THREE.CylinderGeometry(R, R, h, 48), faceMat()));
+      addRim(h/2, R); addRim(-h/2, R);
+      totalV = 0; totalE = 2;
+    }
+  };
+
+  /* ---------- 조작형 데모 ---------- */
+  const demo = { board:null, handles:[], lineMeshes:[], marker:null, planeB:null, lineMesh:null, ixLine:null };
+  const BW = 2.3, BH = 1.5; // 보드 절반 크기
+
+  function makeBoard(parent = group){
+    const b = new THREE.Mesh(new THREE.PlaneGeometry(BW*2, BH*2),
+      new THREE.MeshBasicMaterial({map:boardTexture(), transparent:true, opacity:0.96, side:THREE.DoubleSide}));
+    parent.add(b);
+    return b;
+  }
+  function lineOnBoard(color){ // 보드 위 직선(시각용 + 드래그 판정용)
+    const vis = new THREE.Mesh(new THREE.BoxGeometry(1, 0.05, 0.022), new THREE.MeshBasicMaterial({color}));
+    vis.position.z = 0.03;
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(1, 0.34, 0.26), new THREE.MeshBasicMaterial({visible:false}));
+    hit.position.z = 0.03;
+    demo.board.add(vis); demo.board.add(hit);
+    return {vis, hit};
+  }
+  function clipToBoard(p, d){ // 보드 내부 직선 구간 [t0,t1]
+    let t0 = -Infinity, t1 = Infinity;
+    const upd = (o, dd, lim) => {
+      if(Math.abs(dd) < 1e-9){ if(Math.abs(o) > lim) t1 = -Infinity; return; }
+      let a = (-lim - o)/dd, b = (lim - o)/dd;
+      if(a > b) [a, b] = [b, a];
+      t0 = Math.max(t0, a); t1 = Math.min(t1, b);
+    };
+    upd(p.x, d.x, BW - 0.03); upd(p.y, d.y, BH - 0.03);
+    return t1 > t0 ? [t0, t1] : null;
+  }
+  function updateBoardLine(rec, a, b){ // a,b: 핸들 위치(보드 로컬 2D)
+    const d = {x:b.x - a.x, y:b.y - a.y};
+    const L = Math.hypot(d.x, d.y);
+    const hide = () => { rec.vis.visible = false; rec.hit.visible = false; rec.hit.scale.x = 0.001; };
+    if(L < 0.05){ hide(); return null; }
+    const u = {x:d.x/L, y:d.y/L};
+    const t = clipToBoard(a, u);
+    if(!t){ hide(); return null; }
+    const p0 = {x:a.x + u.x*t[0], y:a.y + u.y*t[0]}, p1 = {x:a.x + u.x*t[1], y:a.y + u.y*t[1]};
+    for(const m of [rec.vis, rec.hit]){
+      m.visible = true;
+      m.scale.x = Math.hypot(p1.x - p0.x, p1.y - p0.y);
+      m.position.set((p0.x + p1.x)/2, (p0.y + p1.y)/2, 0.03);
+      m.rotation.z = Math.atan2(u.y, u.x);
+    }
+    return {p:a, u};
+  }
+  function handleOnBoard(x, y, color){
+    const h = new THREE.Mesh(new THREE.SphereGeometry(0.095, 18, 18),
+      new THREE.MeshPhongMaterial({color}));
+    h.position.set(x, y, 0.06); h.userData = {demoHandle:true};
+    demo.board.add(h);
+    const hit = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({visible:false}));
+    hit.position.copy(h.position); hit.userData = {handleProxy:h};
+    demo.board.add(hit);
+    demo.handles.push({vis:h, hit});
+    return h;
+  }
+
+  function demoLL(){
+    group.rotation.set(0.42, -0.18, 0);
+    demo.board = makeBoard();
+    demo.lineMeshes = [lineOnBoard(0x3e63dd), lineOnBoard(0x2f9e63)];
+    demo.h = [
+      [handleOnBoard(-1.5, -0.65, 0x3e63dd), handleOnBoard(1.3, 0.55, 0x3e63dd)],
+      [handleOnBoard(-1.4, 0.85, 0x2f9e63), handleOnBoard(1.35, -0.8, 0x2f9e63)]
+    ];
+    demo.bodyHits = [
+      {mesh:demo.lineMeshes[0].hit, hs:demo.h[0]},
+      {mesh:demo.lineMeshes[1].hit, hs:demo.h[1]}
+    ];
+    demo.dragRef = demo.board;
+    demo.bounds = {xmin:-(BW - 0.12), xmax:BW - 0.12, ymin:-(BH - 0.12), ymax:BH - 0.12};
+    demo.marker = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 20), new THREE.MeshPhongMaterial({color:C.vOn}));
+    demo.marker.position.z = 0.05; demo.board.add(demo.marker);
+    updateLL();
+    $("demoName").textContent = "선과 선이 만나면? — 구슬이나 직선을 드래그!";
+  }
+  function updateLL(){
+    const L1 = updateBoardLine(demo.lineMeshes[0], demo.h[0][0].position, demo.h[0][1].position);
+    const L2 = updateBoardLine(demo.lineMeshes[1], demo.h[1][0].position, demo.h[1][1].position);
+    const fb = $("demoFb");
+    if(!L1 || !L2){ demo.marker.visible = false; fb.textContent = "손잡이 두 개를 벌려서 직선을 만들어 보세요."; fb.className = "feedback info"; return; }
+    const cross = L1.u.x*L2.u.y - L1.u.y*L2.u.x;
+    if(Math.abs(cross) < 0.045){
+      demo.marker.visible = false;
+      fb.innerHTML = "😮 두 직선이 <b>평행</b>해요 → 아무리 늘여도 만나지 않아서 <b style='color:var(--red);'>교점이 없어요!</b>";
+      fb.className = "feedback";
+      return;
+    }
+    const dx = L2.p.x - L1.p.x, dy = L2.p.y - L1.p.y;
+    const t = (dx*L2.u.y - dy*L2.u.x)/cross;
+    const ix = L1.p.x + L1.u.x*t, iy = L1.p.y + L1.u.y*t;
+    if(Math.abs(ix) <= BW && Math.abs(iy) <= BH){
+      demo.marker.visible = true; demo.marker.position.set(ix, iy, 0.05);
+      fb.innerHTML = "✨ 두 직선이 만나서 <b style='color:var(--red);'>교점 1개</b>가 생겼어요!";
+      fb.className = "feedback ok";
+    } else {
+      demo.marker.visible = false;
+      fb.innerHTML = "🤔 이 평면 안에서는 안 만나요. 하지만 직선은 끝없이 뻗으니까 <b>평면 밖 저 멀리에서</b> 만나요! (평행이 아니라면)";
+      fb.className = "feedback";
+    }
+  }
+
+  function demoLP(){
+    group.rotation.set(0.5, -0.35, 0);
+    demo.board = makeBoard();
+    demo.board.rotation.x = -Math.PI/2; // 바닥에 눕히기
+    /* 직선: 세로 평면(z=0) 위 — 구슬 2개와 몸통으로 직접 조작 */
+    const mkHandle = (x, y) => {
+      const h = new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 18), new THREE.MeshPhongMaterial({color:0x3e63dd}));
+      h.position.set(x, y, 0); group.add(h);
+      const hit = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({visible:false}));
+      hit.position.copy(h.position); hit.userData = {handleProxy:h}; group.add(hit);
+      demo.handles.push({vis:h, hit});
+      return h;
+    };
+    demo.hLP = [mkHandle(-1.8, 1.15), mkHandle(1.25, -0.55)];
+    demo.lineMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 6, 10),
+      new THREE.MeshPhongMaterial({color:0x51607a}));
+    group.add(demo.lineMesh);
+    demo.lineHit = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 6, 8), new THREE.MeshBasicMaterial({visible:false}));
+    group.add(demo.lineHit);
+    demo.bodyHits = [{mesh:demo.lineHit, hs:demo.hLP}];
+    demo.marker = new THREE.Mesh(new THREE.SphereGeometry(0.12, 20, 20), new THREE.MeshPhongMaterial({color:C.vOn}));
+    group.add(demo.marker);
+    demo.dragRef = group; // 직선이 놓인 세로 평면(z=0)
+    demo.bounds = {xmin:-2.1, xmax:2.1, ymin:-1.25, ymax:1.55};
+    $("demoName").textContent = "선과 면이 만나면? — 구슬이나 직선을 드래그!";
+    updateLP();
+  }
+  function updateLP(){
+    const [h1, h2] = demo.hLP, p1 = h1.position, p2 = h2.position;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y, L = Math.hypot(dx, dy);
+    const fb = $("demoFb");
+    if(L < 0.06){
+      demo.lineMesh.visible = false; demo.lineHit.visible = false; demo.marker.visible = false;
+      fb.textContent = "구슬 두 개를 벌려서 직선을 만들어 보세요."; fb.className = "feedback info"; return;
+    }
+    demo.lineMesh.visible = true; demo.lineHit.visible = true;
+    const dir = new THREE.Vector3(dx/L, dy/L, 0);
+    const mid = new THREE.Vector3((p1.x + p2.x)/2, (p1.y + p2.y)/2, 0);
+    for(const m of [demo.lineMesh, demo.lineHit]){
+      m.position.copy(mid);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    }
+    if(Math.abs(dy) < 0.04*L){ // 면과 평행한 방향
+      demo.marker.visible = false;
+      if(Math.abs(p1.y) < 0.07){
+        fb.innerHTML = "😲 직선이 평면 <b>위에 포개져</b> 있어요 → 직선의 모든 점이 면과 만나요!";
+      } else {
+        fb.innerHTML = "😮 직선이 면과 <b>평행</b>해요 → <b style='color:var(--red);'>교점이 없어요!</b>";
+      }
+      fb.className = "feedback"; return;
+    }
+    const t = -p1.y/dy, x0 = p1.x + dx*t; // 직선이 면(y=0)을 지나는 실제 위치
+    if(Math.abs(x0) <= BW){
+      demo.marker.visible = true; demo.marker.position.set(x0, 0, 0);
+      fb.innerHTML = "✨ 직선이 면을 뚫고 지나가요 → 뚫는 자리에 <b style='color:var(--red);'>교점 1개!</b>";
+      fb.className = "feedback ok";
+    } else {
+      demo.marker.visible = false;
+      fb.innerHTML = "🤔 이 범위 안에서는 면과 만나지 않아요. 직선을 옮기거나 기울여 보세요!";
+      fb.className = "feedback";
+    }
+  }
+
+  function demoPP(){
+    group.rotation.set(0.48, -0.3, 0);
+    demo.board = makeBoard(); // 평면 A (바닥)
+    demo.board.rotation.x = -Math.PI/2;
+    /* 보라 평면의 '옆모습(단면선)'을 구슬 2개로 조작 — 세로 평면(x=0) 위에서 움직임 */
+    demo.ctlRef = new THREE.Group();
+    demo.ctlRef.rotation.y = Math.PI/2; // 로컬 z=0 평면 = 그룹의 x=0 평면
+    group.add(demo.ctlRef);
+    const mkHandle = (u, v) => {
+      const h = new THREE.Mesh(new THREE.SphereGeometry(0.1, 18, 18), new THREE.MeshPhongMaterial({color:0x8e4ec6}));
+      h.position.set(u, v, 0); demo.ctlRef.add(h);
+      const hit = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({visible:false}));
+      hit.position.copy(h.position); hit.userData = {handleProxy:h}; demo.ctlRef.add(hit);
+      demo.handles.push({vis:h, hit});
+      return h;
+    };
+    demo.hPP = [mkHandle(0.35, 1.4), mkHandle(-0.5, -0.9)];
+    demo.planeB = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 3.2), faceMat(0xb8a6f5, 0.5));
+    demo.planeB.add(new THREE.LineSegments(
+      new THREE.EdgesGeometry(demo.planeB.geometry),
+      new THREE.LineBasicMaterial({color:0x8e4ec6})));
+    group.add(demo.planeB);
+    demo.ixLine = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.055, 0.055), new THREE.MeshBasicMaterial({color:C.eOn}));
+    group.add(demo.ixLine);
+    demo.board.renderOrder = 1; demo.planeB.renderOrder = 2; demo.ixLine.renderOrder = 3;
+    demo.bodyHits = [{mesh:demo.planeB, hs:demo.hPP}];
+    demo.dragRef = demo.ctlRef;
+    demo.bounds = {xmin:-2.0, xmax:2.0, ymin:-1.3, ymax:1.55};
+    $("demoName").textContent = "면과 면이 만나면? — 구슬이나 보라 면을 드래그!";
+    updatePP();
+  }
+  function updatePP(){
+    const [h1, h2] = demo.hPP, p1 = h1.position, p2 = h2.position;
+    const du = p2.x - p1.x, dv = p2.y - p1.y, L = Math.hypot(du, dv);
+    const fb = $("demoFb");
+    if(L < 0.06){
+      demo.planeB.visible = false; demo.ixLine.visible = false;
+      fb.textContent = "구슬 두 개를 벌려서 평면을 만들어 보세요."; fb.className = "feedback info"; return;
+    }
+    /* 그룹 좌표: ctlRef 로컬 (u,v,0) → (0, v, -u). 보라 평면 = x축 방향 + 단면선 방향으로 펼친 면 */
+    demo.planeB.visible = true;
+    const d = new THREE.Vector3(0, dv/L, -du/L);       // 단면선 방향
+    const e1 = new THREE.Vector3(1, 0, 0);             // 면이 무한히 펼쳐지는 방향
+    const n = new THREE.Vector3().crossVectors(e1, d); // 법선
+    demo.planeB.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(e1, d, n));
+    const vm = (p1.y + p2.y)/2, um = (p1.x + p2.x)/2;
+    demo.planeB.position.set(0, vm, -um);
+    if(Math.abs(dv) < 0.04*L){ // 바닥 면과 평행한 방향
+      demo.ixLine.visible = false;
+      if(Math.abs(p1.y) < 0.07){
+        fb.innerHTML = "😲 두 평면이 <b>완전히 포개져</b> 있어요 → 만나는 부분이 선이 아니라 면 전체예요!";
+      } else {
+        fb.innerHTML = "😮 두 평면이 <b>평행</b>해요 → 만나지 않으니 <b style='color:var(--orange);'>교선이 없어요!</b>";
+      }
+      fb.className = "feedback"; return;
+    }
+    const t = -p1.y/dv, u0 = p1.x + du*t; // 단면선이 바닥(y=0)과 만나는 지점
+    const z0 = -u0;
+    const sDist = Math.hypot(u0 - um, vm); // 보라 면 중심에서 교선까지의 거리(단면선 방향)
+    if(Math.abs(z0) <= BH - 0.02 && sDist <= 1.55){
+      demo.ixLine.visible = true; demo.ixLine.position.set(0, 0.012, z0);
+      fb.innerHTML = "✨ 두 면이 만나는 자리에 <b style='color:var(--orange);'>교선</b>이 생겼어요! 면을 움직이면 교선도 따라 움직여요.";
+      fb.className = "feedback ok";
+    } else {
+      demo.ixLine.visible = false;
+      fb.innerHTML = "🤔 이 범위 안에서는 두 면이 만나지 않아요. 보라 면을 옮기거나 기울여 보세요!";
+      fb.className = "feedback";
+    }
+  }
+
+  const demos = { demoLL, demoLP, demoPP };
+  let currentShape = "cube";
+
+  function setShape(key){
+    clearGroup();
+    Object.assign(demo, {board:null, handles:[], lineMeshes:[], marker:null, planeB:null,
+      lineMesh:null, lineHit:null, ixLine:null, bodyHits:[], dragRef:null, bounds:null,
+      hLP:null, hPP:null, ctlRef:null, h:null});
+    currentShape = key;
+    mode = key.startsWith("demo") ? "demo" : "solid";
+    $("demoCtl").style.display = mode === "demo" ? "block" : "none";
+    $("countCtl").style.display = mode === "solid" ? "block" : "none";
+    if(mode === "demo"){ demos[key](); }
+    else { group.rotation.set(0.35, -0.6, 0); solids[key](); updateCount(); $("fb3d").textContent = ""; $("fb3d").className = "feedback"; autoRotate = true; }
+    if(mode === "demo") autoRotate = false;
+  }
+  document.querySelectorAll(".shapeBtn").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".shapeBtn").forEach(x => x.classList.remove("sel"));
+    b.classList.add("sel");
+    setShape(b.dataset.shape);
+  }));
+
+  const marked = k => group.children.filter(m => m.userData.kind === k && m.userData.marked).length;
+  function updateCount(){ $("vCount").textContent = marked("v"); $("eCount").textContent = marked("e"); }
+  $("btnCheck3d").addEventListener("click", () => {
+    const v = marked("v"), e = marked("e"), fb = $("fb3d");
+    if(v === totalV && e === totalE){
+      fb.innerHTML = `🎉 정답! 교점 <b>${totalV}</b>개, 교선 <b>${totalE}</b>개를 모두 찾았어요!`;
+      fb.className = "feedback ok";
+    } else {
+      const p = [];
+      if(v < totalV) p.push("못 찾은 교점이 있어요"); if(v > totalV) p.push("교점이 너무 많아요");
+      if(e < totalE) p.push("못 찾은 교선이 있어요"); if(e > totalE) p.push("교선이 너무 많아요");
+      fb.textContent = "🤔 " + p.join(" · ") + ". 도형을 돌려 뒤쪽도 보세요!";
+      fb.className = "feedback no";
+    }
+  });
+  $("btnReveal3d").addEventListener("click", () => {
+    group.children.forEach(m => { if(m.userData.kind) markMesh(m, true); });
+    updateCount();
+    $("fb3d").innerHTML = `💡 교점 <b style="color:var(--red);">${totalV}</b>개 · 교선 <b style="color:var(--orange);">${totalE}</b>개`;
+    $("fb3d").className = "feedback info";
+  });
+  $("btnClear3d").addEventListener("click", () => {
+    group.children.forEach(m => { if(m.userData.kind) markMesh(m, false); });
+    updateCount(); $("fb3d").textContent = "";
+  });
+
+  /* 포인터: 회전 / 클릭 / 데모 조작(구슬·직선 드래그) */
+  let dragging = false, dragInfo = null, px = 0, py = 0, movedDist = 0;
+  const el = renderer.domElement;
+  el.style.touchAction = "none";
+  const rayFromEvent = e => {
+    const r = el.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - r.left)/r.width)*2 - 1, -((e.clientY - r.top)/r.height)*2 + 1);
+    const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, camera);
+    return rc;
+  };
+  /* 기준 물체(ref)의 로컬 z=0 평면 위 포인터 위치(로컬 좌표) */
+  function planeLocalPoint(e, ref){
+    const rc = rayFromEvent(e);
+    const q = new THREE.Quaternion(), p = new THREE.Vector3();
+    ref.getWorldQuaternion(q); ref.getWorldPosition(p);
+    const n = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    const pl = new THREE.Plane().setFromNormalAndCoplanarPoint(n, p);
+    const pt = new THREE.Vector3();
+    if(!rc.ray.intersectPlane(pl, pt)) return null;
+    return ref.worldToLocal(pt.clone());
+  }
+  const syncHit = vis => {
+    const rec = demo.handles.find(h => h.vis === vis);
+    if(rec) rec.hit.position.copy(vis.position);
+  };
+  const updateDemo = () => {
+    if(currentShape === "demoLL") updateLL();
+    else if(currentShape === "demoLP") updateLP();
+    else if(currentShape === "demoPP") updatePP();
+  };
+  el.addEventListener("pointerdown", e => {
+    autoRotate = false; $("rotateHint").style.display = "none";
+    el.setPointerCapture(e.pointerId);
+    px = e.clientX; py = e.clientY; movedDist = 0; dragInfo = null;
+    if(mode === "demo" && demo.dragRef){
+      const rc = rayFromEvent(e);
+      const hHits = rc.intersectObjects(demo.handles.map(h => h.hit), false);
+      if(hHits.length){
+        dragInfo = {kind:"handle", h:hHits[0].object.userData.handleProxy};
+      } else if(demo.bodyHits.length){
+        const bHits = rc.intersectObjects(demo.bodyHits.map(b => b.mesh), false);
+        if(bHits.length){
+          const rec = demo.bodyHits.find(b => b.mesh === bHits[0].object);
+          const p = planeLocalPoint(e, demo.dragRef);
+          if(rec && p) dragInfo = {kind:"body", hs:rec.hs, prev:{x:p.x, y:p.y}};
+        }
+      }
+    }
+    dragging = true;
+    wrap.classList.add("grabbing");
+  });
+  el.addEventListener("pointermove", e => {
+    if(!dragging){
+      /* 잡을 수 있는 것 위에서는 커서 모양 바꾸기 */
+      if(mode === "demo" && demo.dragRef){
+        const rc = rayFromEvent(e);
+        const grabbable =
+          rc.intersectObjects(demo.handles.map(h => h.hit), false).length ||
+          (demo.bodyHits.length && rc.intersectObjects(demo.bodyHits.map(b => b.mesh), false).length);
+        el.style.cursor = grabbable ? "pointer" : "";
+      }
+      return;
+    }
+    const dxs = e.clientX - px, dys = e.clientY - py;
+    movedDist += Math.abs(dxs) + Math.abs(dys);
+    if(dragInfo){
+      const p = planeLocalPoint(e, demo.dragRef);
+      if(p){
+        const b = demo.bounds;
+        if(dragInfo.kind === "handle"){
+          dragInfo.h.position.x = Math.max(b.xmin, Math.min(b.xmax, p.x));
+          dragInfo.h.position.y = Math.max(b.ymin, Math.min(b.ymax, p.y));
+          syncHit(dragInfo.h);
+        } else {
+          let dx = p.x - dragInfo.prev.x, dy = p.y - dragInfo.prev.y;
+          for(const h of dragInfo.hs){ // 두 구슬이 모두 범위 안에 있도록 이동량 제한
+            dx = Math.max(b.xmin - h.position.x, Math.min(b.xmax - h.position.x, dx));
+            dy = Math.max(b.ymin - h.position.y, Math.min(b.ymax - h.position.y, dy));
+          }
+          dragInfo.hs.forEach(h => { h.position.x += dx; h.position.y += dy; syncHit(h); });
+          dragInfo.prev = {x:dragInfo.prev.x + dx, y:dragInfo.prev.y + dy};
+        }
+        updateDemo();
+      }
+    } else {
+      group.rotation.y += dxs * 0.008;
+      group.rotation.x = Math.max(-1.4, Math.min(1.4, group.rotation.x + dys * 0.008));
+    }
+    px = e.clientX; py = e.clientY;
+  });
+  el.addEventListener("pointerup", e => {
+    dragging = false; wrap.classList.remove("grabbing");
+    if(movedDist < 7 && mode === "solid"){
+      const rc = rayFromEvent(e);
+      const hits = rc.intersectObjects(hitTargets, false);
+      if(hits.length){
+        const m = hits[0].object.userData.proxy;
+        markMesh(m, !m.userData.marked);
+        updateCount();
+      }
+    }
+    dragInfo = null;
+  });
+  el.addEventListener("wheel", e => {
+    e.preventDefault();
+    camera.position.z = Math.max(3.2, Math.min(11, camera.position.z * (e.deltaY > 0 ? 1.08 : 1/1.08)));
+  }, {passive:false});
+
+  function resize(){
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if(!w || !h) return;
+    renderer.setSize(w, h);
+    camera.aspect = w/h; camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(wrap);
+  window.addEventListener("resize", resize);
+  resize();
+
+  (function loop(){
+    requestAnimationFrame(loop);
+    if(autoRotate) group.rotation.y += 0.004;
+    renderer.render(scene, camera);
+  })();
+  setShape("cube");
+})();
+
+/* ================================================================
+   2. 직선·반직선·선분
+================================================================ */
+(() => {
+  const cv = $("cv2"), ctx = cv.getContext("2d");
+  const state = { line:false, rayab:false, rayba:false, seg:false };
+  const P = { A:{x:0.3, y:0.6}, B:{x:0.7, y:0.4} };
+  let dragPt = null;
+  const COLS = { line:"#3e63dd", rayab:"#2f9e63", rayba:"#f5820b", seg:"#8e4ec6" };
+  const WID  = { line:13, rayab:9, rayba:5.5, seg:2.6 };
+
+  const gW = () => cv.clientWidth, gH = () => cv.clientHeight;
+  const px = p => ({x:p.x*gW(), y:p.y*gH()});
+  function exitPoint(o, d){
+    const W = gW(), H = gH(); let t = Infinity;
+    if(d.x > 0) t = Math.min(t, (W - o.x)/d.x); if(d.x < 0) t = Math.min(t, -o.x/d.x);
+    if(d.y > 0) t = Math.min(t, (H - o.y)/d.y); if(d.y < 0) t = Math.min(t, -o.y/d.y);
+    return {x:o.x + d.x*t, y:o.y + d.y*t};
+  }
+  function arrow(p, d, col, s = 1){
+    const a = Math.atan2(d.y, d.x);
+    ctx.fillStyle = col; ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x - 15*s*Math.cos(a - 0.4), p.y - 15*s*Math.sin(a - 0.4));
+    ctx.lineTo(p.x - 15*s*Math.cos(a + 0.4), p.y - 15*s*Math.sin(a + 0.4));
+    ctx.fill();
+  }
+  function draw(){
+    const W = gW(), H = gH();
+    ctx.clearRect(0, 0, W, H);
+    const A = px(P.A), B = px(P.B);
+    const d = {x:B.x - A.x, y:B.y - A.y}, len = Math.hypot(d.x, d.y) || 1;
+    const u = {x:d.x/len, y:d.y/len};
+    ctx.lineCap = "round";
+    const strokeFromTo = (p, q, k) => {
+      ctx.strokeStyle = COLS[k]; ctx.lineWidth = WID[k];
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+    };
+    /* 모두 점 A, B를 정확히 지나도록 같은 직선 위에 굵기만 다르게 겹쳐 그림 */
+    if(state.line){
+      const e1 = exitPoint(A, {x:-u.x, y:-u.y}), e2 = exitPoint(A, u);
+      strokeFromTo(e1, e2, "line"); arrow(e1, {x:-u.x, y:-u.y}, COLS.line, 1.15); arrow(e2, u, COLS.line, 1.15);
+    }
+    if(state.rayab){
+      const e = exitPoint(A, u);
+      strokeFromTo(A, e, "rayab"); arrow(e, u, COLS.rayab);
+      ctx.fillStyle = COLS.rayab; ctx.beginPath(); ctx.arc(A.x, A.y, 8.5, 0, 7); ctx.fill();
+    }
+    if(state.rayba){
+      const e = exitPoint(B, {x:-u.x, y:-u.y});
+      strokeFromTo(B, e, "rayba"); arrow(e, {x:-u.x, y:-u.y}, COLS.rayba);
+      ctx.fillStyle = COLS.rayba; ctx.beginPath(); ctx.arc(B.x, B.y, 6, 0, 7); ctx.fill();
+    }
+    if(state.seg) strokeFromTo(A, B, "seg");
+    /* 점 A, B — 선 위에 정확히 */
+    [["A", A], ["B", B]].forEach(([nm, p]) => {
+      ctx.fillStyle = "#1d2433"; ctx.beginPath(); ctx.arc(p.x, p.y, 7.5, 0, 7); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 7); ctx.fill();
+      const off = 22, nx = -u.y, ny = u.x;
+      mDrawC(ctx, p.x + nx*off*(ny <= 0 ? 1 : -1), p.y + ny*off*(ny <= 0 ? 1 : -1) + 5, [{v:nm}], 17);
+    });
+  }
+  function updateCompareText(){
+    const fb = $("fb2compare");
+    const on = Object.keys(state).filter(k => state[k]);
+    let msg = [];
+    if(!on.length) msg.push("위의 버튼을 눌러 도형을 나타내 보세요.");
+    else {
+      if(state.rayab && state.rayba)
+        msg.push(`${tex.ray("AB")}와 ${tex.ray("BA")}는 <b>시작점도, 뻗는 방향도 달라요</b> → 서로 <b style="color:var(--red);">다른</b> 반직선!`);
+      else if(state.rayab) msg.push(`${tex.ray("AB")} : 점 \\(A\\)에서 시작해 \\(B\\) 쪽으로 끝없이 뻗어요.`);
+      else if(state.rayba) msg.push(`${tex.ray("BA")} : 점 \\(B\\)에서 시작해 \\(A\\) 쪽으로 끝없이 뻗어요.`);
+      if(state.line && (state.seg || state.rayab || state.rayba))
+        msg.push(`선분과 반직선은 모두 ${tex.line("AB")}의 일부분이에요.`);
+      else if(state.line) msg.push(`${tex.line("AB")} : 두 점을 지나 양쪽으로 끝없이 뻗어요. ${tex.line("AB")} = ${tex.line("BA")}`);
+      if(state.seg && on.length === 1) msg.push(`${tex.seg("AB")} : 두 점 사이의 부분이에요. ${tex.seg("AB")} = ${tex.seg("BA")}`);
+    }
+    fb.innerHTML = msg.join("<br>");
+    TS(fb);
+  }
+  document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+    state[c.dataset.k] = !state[c.dataset.k];
+    c.classList.toggle("on", state[c.dataset.k]);
+    draw(); updateCompareText();
+  }));
+  cv.addEventListener("pointerdown", e => {
+    const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    for(const k of ["A","B"]){
+      const p = px(P[k]);
+      if(Math.hypot(mx - p.x, my - p.y) < 24){ dragPt = k; cv.setPointerCapture(e.pointerId); break; }
+    }
+  });
+  cv.addEventListener("pointermove", e => {
+    if(!dragPt) return;
+    const r = cv.getBoundingClientRect();
+    P[dragPt].x = Math.min(0.96, Math.max(0.04, (e.clientX - r.left)/gW()));
+    P[dragPt].y = Math.min(0.92, Math.max(0.1, (e.clientY - r.top)/gH()));
+    draw();
+  });
+  cv.addEventListener("pointerup", () => dragPt = null);
+  autoFit(cv, draw);
+  updateCompareText();
+
+  /* ----- 퀴즈 ----- */
+  const cq = $("cvq"), qtx = cq.getContext("2d");
+  let quiz = null, score = 0, tries = 0, answered = false;
+  const PTS = ["A","B","C"];
+  const qW = () => cq.clientWidth, qH = () => cq.clientHeight;
+  const ptX = i => [0.2, 0.5, 0.8][i] * qW();
+
+  function drawQuiz(){
+    if(!quiz) return;
+    const W = qW(), H = qH(), y = H * 0.48;
+    qtx.clearRect(0, 0, W, H);
+    qtx.strokeStyle = "#cdd6e4"; qtx.lineWidth = 2;
+    qtx.beginPath(); qtx.moveTo(0, y); qtx.lineTo(W, y); qtx.stroke();
+    const [i, j] = quiz.idx, x1 = ptX(i), x2 = ptX(j), dir = Math.sign(x2 - x1);
+    qtx.strokeStyle = "#e5484d"; qtx.lineWidth = 5; qtx.lineCap = "round";
+    const arrowQ = (x, sgn) => {
+      qtx.fillStyle = "#e5484d"; qtx.beginPath();
+      qtx.moveTo(x, y); qtx.lineTo(x - sgn*14, y - 6.5); qtx.lineTo(x - sgn*14, y + 6.5); qtx.fill();
+    };
+    qtx.beginPath();
+    if(quiz.type === "seg"){ qtx.moveTo(x1, y); qtx.lineTo(x2, y); qtx.stroke(); }
+    else if(quiz.type === "line"){
+      qtx.moveTo(16, y); qtx.lineTo(W - 16, y); qtx.stroke(); arrowQ(W - 8, 1); arrowQ(8, -1);
+    } else {
+      const end = dir > 0 ? W - 16 : 16;
+      qtx.moveTo(x1, y); qtx.lineTo(end, y); qtx.stroke(); arrowQ(dir > 0 ? W - 8 : 8, dir);
+      qtx.fillStyle = "#e5484d"; qtx.beginPath(); qtx.arc(x1, y, 7.5, 0, 7); qtx.fill();
+    }
+    PTS.forEach((nm, k) => {
+      const x = ptX(k);
+      qtx.fillStyle = "#1d2433"; qtx.beginPath(); qtx.arc(x, y, 5.5, 0, 7); qtx.fill();
+      qtx.fillStyle = "#fff"; qtx.beginPath(); qtx.arc(x, y, 2.1, 0, 7); qtx.fill();
+      mDrawC(qtx, x, y + 30, [{v:nm}], 16);
+    });
+  }
+  function newQuiz(){
+    answered = false;
+    const type = ["line","ray","seg"][Math.floor(Math.random()*3)];
+    const pairs = [[0,1],[1,2],[0,2]];
+    let [i, j] = pairs[Math.floor(Math.random()*3)];
+    if(Math.random() < 0.5) [i, j] = [j, i];
+    const nm = PTS[i] + PTS[j], rev = PTS[j] + PTS[i];
+    let choices;
+    if(type === "line") choices = [["line",nm,true], ["ray",nm,false], ["seg",nm,false], ["ray",rev,false]];
+    if(type === "ray")  choices = [["ray",nm,true], ["ray",rev,false], ["line",nm,false], ["seg",nm,false]];
+    if(type === "seg")  choices = [["seg",nm,true], ["ray",nm,false], ["line",nm,false], ["ray",rev,false]];
+    choices.sort(() => Math.random() - 0.5);
+    quiz = {type, idx:[i,j], nm, rev, choices};
+    drawQuiz();
+    const box = $("choices");
+    box.innerHTML = "";
+    choices.forEach(([t, p, ok]) => {
+      const b = document.createElement("button");
+      b.innerHTML = `${symName[t]} ${tex[t](p)}`;
+      b.addEventListener("click", () => pick(b, ok));
+      box.appendChild(b);
+    });
+    TS(box);
+    $("fbq").textContent = ""; $("fbq").className = "feedback";
+  }
+  function explain(){
+    const {type, nm, rev} = quiz;
+    if(type === "ray") return `점 \\(${nm[0]}\\)에서 시작해 \\(${nm[1]}\\) 쪽으로 뻗으니까 ${tex.ray(nm)}! ${tex.ray(rev)}는 시작점·방향이 반대인 다른 반직선이에요.`;
+    if(type === "line") return `양쪽으로 끝없이 뻗으니까 직선! ${tex.line(nm)} = ${tex.line(rev)} 로 같은 직선이에요.`;
+    return `두 점 사이의 부분만 있으니까 선분! ${tex.seg(nm)} = ${tex.seg(rev)} 로 같은 선분이에요.`;
+  }
+  function pick(btn, ok){
+    if(answered) return;
+    answered = true; tries++;
+    const fb = $("fbq");
+    if(ok){ score++; btn.classList.add("correct"); fb.innerHTML = "🎉 정답! " + explain(); fb.className = "feedback ok"; }
+    else {
+      btn.classList.add("wrong");
+      [...$("choices").children].forEach((b, k) => { if(quiz.choices[k][2]) b.classList.add("correct"); });
+      fb.innerHTML = "😅 아쉬워요. " + explain(); fb.className = "feedback no";
+    }
+    TS(fb);
+    $("score2").textContent = `${score} / ${tries}`;
+  }
+  $("btnNextQ").addEventListener("click", newQuiz);
+  autoFit(cq, drawQuiz);
+  newQuiz();
+})();
+
+/* ================================================================
+   3. 두 점 사이의 거리
+================================================================ */
+(() => {
+  const SCALE = 45;
+  /* ----- 활동 1 ----- */
+  const cv = $("cv3a"), ctx = cv.getContext("2d");
+  let drawing = false, path = [], attempts = [];
+  const gW = () => cv.clientWidth, gH = () => cv.clientHeight;
+  const ptA = () => ({x:58, y:gH()*0.62}), ptB = () => ({x:gW() - 58, y:gH()*0.34});
+  const pathLen = pts => pts.reduce((s, p, i) => i ? s + Math.hypot(p.x - pts[i-1].x, p.y - pts[i-1].y) : 0, 0);
+  const cm = v => (v/SCALE).toFixed(1);
+
+  function drawA(){
+    const W = gW(), H = gH(), A = ptA(), B = ptB();
+    ctx.clearRect(0, 0, W, H);
+    attempts.forEach(at => {
+      ctx.strokeStyle = at.best ? "rgba(47,158,99,.55)" : "rgba(104,115,138,.25)";
+      ctx.lineWidth = at.best ? 3 : 2.5;
+      ctx.beginPath(); at.pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+    });
+    if(path.length > 1){
+      ctx.strokeStyle = "#e5484d"; ctx.lineWidth = 3.5; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.beginPath(); path.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke();
+    }
+    ctx.strokeStyle = "#3e63dd"; ctx.lineWidth = 3; ctx.setLineDash([9, 7]);
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+    ctx.setLineDash([]);
+    [["A", A], ["B", B]].forEach(([nm, p]) => {
+      ctx.fillStyle = "#1d2433"; ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, 7); ctx.fill();
+      ctx.fillStyle = "#ffd94a"; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, 7); ctx.fill();
+      mDrawC(ctx, p.x, p.y - 16, [{v:nm}], 17);
+    });
+    const mid = {x:(A.x + B.x)/2, y:(A.y + B.y)/2};
+    mDrawC(ctx, mid.x, mid.y + 28, [{v:"AB", d:"bar"}, {t:` = ${cm(Math.hypot(B.x - A.x, B.y - A.y))} cm`}], 15, "#3e63dd");
+  }
+  cv.addEventListener("pointerdown", e => {
+    const r = cv.getBoundingClientRect(), p = {x:e.clientX - r.left, y:e.clientY - r.top}, A = ptA();
+    if(Math.hypot(p.x - A.x, p.y - A.y) < 32){
+      drawing = true; path = [{x:A.x, y:A.y}]; cv.setPointerCapture(e.pointerId);
+    } else { $("fb3a").innerHTML = "✋ 점 \\(A\\)에서 출발해야 해요!"; TS($("fb3a")); }
+  });
+  cv.addEventListener("pointermove", e => {
+    if(!drawing) return;
+    const r = cv.getBoundingClientRect();
+    path.push({x:e.clientX - r.left, y:e.clientY - r.top});
+    drawA();
+  });
+  cv.addEventListener("pointerup", () => {
+    if(!drawing) return;
+    drawing = false;
+    const A = ptA(), B = ptB(), last = path[path.length - 1];
+    const fb = $("fb3a");
+    if(Math.hypot(last.x - B.x, last.y - B.y) < 32){
+      path.push({x:B.x, y:B.y});
+      const myLen = pathLen(path), straight = Math.hypot(B.x - A.x, B.y - A.y);
+      attempts.push({pts:path, len:myLen});
+      attempts.forEach(a => a.best = false);
+      attempts.reduce((m, a) => a.len < m.len ? a : m, attempts[0]).best = true;
+      const diff = myLen - straight;
+      fb.innerHTML =
+        `📏 내가 그린 길 \\(= ${cm(myLen)}\\) cm, \\(\\overline{AB} = ${cm(straight)}\\) cm<br>` +
+        (diff < straight*0.02
+          ? `😲 거의 선분처럼 곧게 그렸네요! 그래도 선분보다 짧을 수는 없어요 → \\(\\overline{AB}\\)의 길이가 <b style="color:var(--red);">두 점 사이의 거리</b>!`
+          : `<b style="color:var(--red);">\\(${cm(diff)}\\) cm 더 길어요!</b> 몇 번을 그려도 선분보다 짧게는 안 돼요 → 가장 짧은 길 \\(=\\overline{AB}\\)`);
+      path = [];
+      drawA();
+    } else {
+      path = []; drawA();
+      fb.innerHTML = "✋ 점 \\(B\\)까지 이어서 그려야 측정할 수 있어요. 다시 도전!";
+    }
+    TS(fb);
+  });
+  $("btnClearPath").addEventListener("click", () => {
+    attempts = []; path = []; drawA();
+    $("fb3a").innerHTML = "🖊️ \\(A\\)에 대고 누른 채로 \\(B\\)까지 그린 뒤 손을 떼면 길이가 측정돼요.";
+    TS($("fb3a"));
+  });
+  autoFit(cv, drawA);
+
+  /* ----- 활동 2: 중점 찾기 ----- */
+  const cb = $("cv3b"), btx = cb.getContext("2d");
+  let abCm = 12, mPos = 0.31, nPos = 0.8, stage = 1, dragTarget = null, foundM = false, foundN = false;
+  const lens = [8, 10, 12, 14, 16, 20];
+  const bW = () => cb.clientWidth, bH = () => cb.clientHeight;
+  function geoB(){
+    const W = bW(), margin = 52, scale = (W - margin*2)/abCm;
+    return {W, ax:margin, bx:margin + abCm*scale, y:bH()*0.56};
+  }
+  function drawB(){
+    const {W, ax, bx, y} = geoB(), H = bH();
+    btx.clearRect(0, 0, W, H);
+    const mx = ax + (bx - ax)*mPos;
+    btx.lineCap = "round";
+    btx.strokeStyle = "#9fb4f2"; btx.lineWidth = 7;
+    btx.beginPath(); btx.moveTo(ax, y); btx.lineTo(mx, y); btx.stroke();
+    btx.strokeStyle = "#8fd6ae";
+    btx.beginPath(); btx.moveTo(mx, y); btx.lineTo(bx, y); btx.stroke();
+    const amCm = abCm*mPos, mbCm = abCm*(1 - mPos);
+    mDrawC(btx, (ax + mx)/2, y - 30, [{v:"AM", d:"bar"}, {t:` = ${amCm.toFixed(1)}`}], 14, "#3e63dd");
+    mDrawC(btx, (mx + bx)/2, y - 30, [{v:"MB", d:"bar"}, {t:` = ${mbCm.toFixed(1)}`}], 14, "#2f9e63");
+    let nx = null;
+    if(stage === 2){
+      nx = mx + (bx - mx)*nPos;
+      const mnCm = mbCm*nPos, nbCm = mbCm*(1 - nPos);
+      mDrawC(btx, (mx + nx)/2, y + 40, [{v:"MN", d:"bar"}, {t:` = ${mnCm.toFixed(1)}`}], 13, "#f5820b");
+      mDrawC(btx, (nx + bx)/2, y + 40, [{v:"NB", d:"bar"}, {t:` = ${nbCm.toFixed(1)}`}], 13, "#8e4ec6");
+    }
+    mDrawC(btx, (ax + bx)/2, y + (stage === 2 ? 62 : 44), [{v:"AB", d:"bar"}, {t:` = ${abCm} cm`}], 13, "#68738a");
+    [["A", ax], ["B", bx]].forEach(([nm, x]) => {
+      btx.fillStyle = "#1d2433"; btx.beginPath(); btx.arc(x, y, 6.5, 0, 7); btx.fill();
+      mDrawC(btx, x, y - 14, [{v:nm}], 15);
+    });
+    const handle = (x, col, nm, found) => {
+      btx.fillStyle = "#fff"; btx.strokeStyle = col; btx.lineWidth = 4;
+      btx.beginPath(); btx.arc(x, y, 11, 0, 7); btx.fill(); btx.stroke();
+      btx.fillStyle = col; btx.beginPath(); btx.arc(x, y, 4, 0, 7); btx.fill();
+      mDrawC(btx, x + (found ? -6 : 0), y + 26, [{v:nm}], 14, col);
+      if(found){ btx.fillStyle = col; btx.font = "800 12px sans-serif"; btx.fillText("✓", x + 5, y + 26); }
+    };
+    handle(mx, "#3e63dd", "M", foundM);
+    if(stage === 2) handle(nx, "#f5820b", "N", foundN);
+  }
+  function hitHandle(e){
+    const {ax, bx, y} = geoB();
+    const r = cb.getBoundingClientRect(), mx0 = e.clientX - r.left, my0 = e.clientY - r.top;
+    const mx = ax + (bx - ax)*mPos;
+    if(stage === 2){
+      const nx = mx + (bx - mx)*nPos;
+      if(Math.hypot(mx0 - nx, my0 - y) < 24) return "N";
+    }
+    if(Math.hypot(mx0 - mx, my0 - y) < 24) return "M";
+    return null;
+  }
+  cb.addEventListener("pointerdown", e => { dragTarget = hitHandle(e); if(dragTarget) cb.setPointerCapture(e.pointerId); });
+  cb.addEventListener("pointermove", e => {
+    if(!dragTarget) return;
+    const {ax, bx} = geoB();
+    const r = cb.getBoundingClientRect(), x = e.clientX - r.left;
+    const fb = $("fb3b");
+    if(dragTarget === "M" && stage === 1){
+      mPos = Math.min(0.97, Math.max(0.03, (x - ax)/(bx - ax)));
+      if(Math.abs(abCm*mPos - abCm/2) < 0.12){
+        mPos = 0.5;
+        if(!foundM){
+          foundM = true;
+          fb.innerHTML = `✨ 중점 발견! \\(\\overline{AM}=\\overline{BM}=\\frac{1}{2}\\times ${abCm}=${abCm/2}\\) cm`;
+          fb.className = "feedback ok"; TS(fb);
+          $("btnStageN").style.display = "inline-flex";
+        }
+      } else if(foundM){ foundM = false; fb.textContent = ""; $("btnStageN").style.display = "none"; }
+    }
+    if(dragTarget === "N" && stage === 2){
+      const mx = ax + (bx - ax)*mPos;
+      nPos = Math.min(0.97, Math.max(0.03, (x - mx)/(bx - mx)));
+      const mbCm = abCm*(1 - mPos);
+      if(Math.abs(mbCm*(1 - nPos) - mbCm/2) < 0.12){
+        nPos = 0.5;
+        if(!foundN){
+          foundN = true;
+          fb.innerHTML = `🎉 완벽! \\(\\overline{NB}=\\frac{1}{2}\\overline{MB}=\\frac{1}{4}\\overline{AB}=${abCm/4}\\) cm — 반의 반은 \\(\\frac{1}{4}\\)!`;
+          fb.className = "feedback ok"; TS(fb);
+        }
+      } else if(foundN){ foundN = false; fb.textContent = ""; }
+    }
+    drawB();
+  });
+  cb.addEventListener("pointerup", () => dragTarget = null);
+  $("btnStageN").addEventListener("click", () => {
+    stage = 2; nPos = 0.28; foundN = false;
+    $("btnStageN").style.display = "none";
+    $("hint3b").innerHTML = `주황 점 \\(N\\)을 드래그해서 \\(\\overline{MN}=\\overline{NB}\\)가 되는 자리(\\(\\overline{MB}\\)의 중점)에 놓아 보세요.`;
+    TS($("hint3b"));
+    $("fb3b").textContent = "";
+    drawB();
+  });
+  $("btnNewMid").addEventListener("click", () => {
+    abCm = lens[Math.floor(Math.random()*lens.length)];
+    mPos = 0.2 + Math.random()*0.25; stage = 1; foundM = foundN = false;
+    $("btnStageN").style.display = "none";
+    $("hint3b").innerHTML = `파란 점 \\(M\\)을 드래그해서 \\(\\overline{AM}=\\overline{MB}\\)가 되는 자리(중점)에 놓아 보세요.`;
+    TS($("hint3b"));
+    $("fb3b").textContent = "";
+    drawB();
+  });
+  autoFit(cb, drawB);
+
+  /* ----- 활동 3: 계산 도전 ----- */
+  const cc = $("cv3c"), ctx3 = cc.getContext("2d");
+  let calcAB = 24, cScore = 0, cTries = 0;
+  const cW = () => cc.clientWidth, cH = () => cc.clientHeight;
+  function drawC(){
+    const W = cW(), H = cH(), y = H*0.62, m = 46;
+    ctx3.clearRect(0, 0, W, H);
+    const ax = m, bx = W - m, mx = (ax + bx)/2, nx = mx + (bx - mx)/2;
+    ctx3.strokeStyle = "#68738a"; ctx3.lineWidth = 3; ctx3.lineCap = "round";
+    ctx3.beginPath(); ctx3.moveTo(ax, y); ctx3.lineTo(bx, y); ctx3.stroke();
+    ctx3.strokeStyle = "#c3cbda"; ctx3.lineWidth = 1.5;
+    ctx3.beginPath(); ctx3.moveTo(ax, y - 24); ctx3.lineTo(bx, y - 24); ctx3.stroke();
+    [ax, bx].forEach(x => { ctx3.beginPath(); ctx3.moveTo(x, y - 29); ctx3.lineTo(x, y - 19); ctx3.stroke(); });
+    mDrawC(ctx3, (ax + bx)/2, y - 32, [{v:"AB", d:"bar"}, {t:` = ${calcAB} cm`}], 14, "#e5484d");
+    [["A", ax, "#1d2433"], ["M", mx, "#3e63dd"], ["N", nx, "#f5820b"], ["B", bx, "#1d2433"]].forEach(([nm, x, col]) => {
+      ctx3.fillStyle = col; ctx3.beginPath(); ctx3.arc(x, y, 5.5, 0, 7); ctx3.fill();
+      mDrawC(ctx3, x, y + 22, [{v:nm}], 14, col);
+    });
+  }
+  function newCalc(){
+    const opts = [12, 16, 20, 24, 28, 32, 36, 40];
+    calcAB = opts[Math.floor(Math.random()*opts.length)];
+    ["inAM","inMN","inNB"].forEach(id => { $(id).value = ""; $(id).className = ""; });
+    $("fb3c").textContent = ""; $("fb3c").className = "feedback";
+    drawC();
+  }
+  $("btnCheckCalc").addEventListener("click", () => {
+    const ans = { inAM:calcAB/2, inMN:calcAB/4, inNB:calcAB/4 };
+    let allOk = true, anyEmpty = false;
+    for(const id in ans){
+      const el = $(id);
+      if(el.value === ""){ anyEmpty = true; el.className = ""; continue; }
+      const ok = Math.abs(parseFloat(el.value) - ans[id]) < 0.001;
+      el.className = ok ? "good" : "bad";
+      if(!ok) allOk = false;
+    }
+    const fb = $("fb3c");
+    if(anyEmpty){ fb.textContent = "빈칸을 모두 채워 주세요!"; fb.className = "feedback no"; return; }
+    cTries++;
+    if(allOk){
+      cScore++;
+      fb.innerHTML = `🎉 정답! \\(\\overline{AM}=\\frac{1}{2}\\times${calcAB}=${calcAB/2}\\), \\(\\overline{MN}=\\overline{NB}=\\frac{1}{4}\\times${calcAB}=${calcAB/4}\\) (cm)`;
+      fb.className = "feedback ok";
+    } else {
+      fb.innerHTML = `🤔 힌트: \\(\\overline{AM}=\\overline{MB}=\\frac{1}{2}\\overline{AB}\\), \\(\\overline{MN}=\\overline{NB}=\\frac{1}{2}\\overline{MB}\\)`;
+      fb.className = "feedback no";
+    }
+    TS(fb);
+    $("score3").textContent = `${cScore} / ${cTries}`;
+  });
+  $("btnNewCalc").addEventListener("click", newCalc);
+  autoFit(cc, drawC);
+  newCalc();
+})();
+})();
+</script>
+</body>
+</html>
