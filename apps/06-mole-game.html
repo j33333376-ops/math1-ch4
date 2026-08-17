@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>두더지 잡기 — 동위각과 엇각</title>
+<link rel="stylesheet" href="../assets/common.css">
+<script src="../assets/common.js" data-home="../index.html" defer></script>
+<style>
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:var(--font); background:var(--bg); color:var(--ink);
+    overflow:hidden;
+  }
+  #app{height:100%; display:flex; flex-direction:column;}
+
+  /* ---------- 머리말 ---------- */
+  header{
+    display:flex; align-items:center; gap:18px; padding:0 16px; height:52px; flex:none;
+    background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  header h1{font-size:17px; font-weight:800; white-space:nowrap;}
+  header nav{display:flex; gap:6px;}
+  header nav button{
+    font:600 14px/1 var(--font); padding:8px 13px; border-radius:9px;
+    border:1px solid transparent; background:none; color:var(--sub); cursor:pointer;
+    white-space:nowrap;
+  }
+  header nav button:hover{background:var(--accent-soft); color:var(--accent);}
+  header nav button.on{background:var(--accent-soft); color:var(--accent); border-color:#c7d3f7;}
+
+  /* ---------- 본문 ---------- */
+  main{
+    flex:1; min-height:0; padding:12px;
+    display:grid; grid-template-columns:1fr 336px; gap:12px;
+  }
+  .board-wrap{
+    position:relative; min-width:0;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius); overflow:hidden;
+  }
+  #board{width:100%; height:100%; display:block; cursor:pointer; touch-action:manipulation;}
+
+  /* 보드 위에 뜨는 큰 안내 */
+  #banner{
+    position:absolute; left:50%; top:14px; transform:translateX(-50%);
+    background:rgba(29,36,51,.86); color:#fff; font-weight:700; font-size:15px;
+    padding:9px 18px; border-radius:999px; pointer-events:none;
+    white-space:nowrap; transition:.2s; opacity:0;
+  }
+  #banner.show{opacity:1;}
+  #banner b.dw{color:#7ee2a8;}
+  #banner b.et{color:#ffc46b;}
+
+  aside{
+    min-width:0; overflow-y:auto;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .blk{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius); padding:13px 14px;
+  }
+  .blk h2{font-size:14px; font-weight:800; margin-bottom:8px; display:flex; align-items:center; gap:6px;}
+  .blk h2 .tag{
+    font-size:11px; font-weight:700; color:#fff; background:var(--accent);
+    padding:3px 8px; border-radius:6px;
+  }
+  .blk p{font-size:13.5px; line-height:1.65; color:var(--sub);}
+  .blk p b{color:var(--ink);}
+
+  .row{display:flex; flex-wrap:wrap; gap:6px;}
+  .btn{
+    font:600 14px/1 var(--font); padding:9px 13px; border-radius:9px;
+    border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer;
+    transition:.14s;
+  }
+  .btn:hover{background:var(--accent-soft); border-color:var(--accent); color:var(--accent);}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .btn.primary:hover{background:var(--accent-dark); color:#fff;}
+  .btn.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent);}
+  .btn.sm{padding:7px 10px; font-size:13px;}
+  .btn.num{min-width:38px; padding:8px 0; text-align:center;}
+
+  .fb{font-size:13.5px; font-weight:600; line-height:1.6; padding:9px 11px; border-radius:9px; margin-top:9px;}
+  .fb.ok{background:var(--ok-soft); color:var(--ok);}
+  .fb.no{background:var(--no-soft); color:var(--no);}
+  .fb.info{background:var(--accent-soft); color:var(--accent-dark);}
+
+  /* 용어 카드 */
+  .term{border-left:4px solid var(--ok); background:#f6fbf8; padding:11px 13px; border-radius:9px; margin-top:9px;}
+  .term.et{border-left-color:var(--warn); background:#fff9f0;}
+  .term h3{font-size:14px; font-weight:800; margin-bottom:4px;}
+  .term h3 .k{color:var(--ok);}
+  .term.et h3 .k{color:var(--warn);}
+  .term p{font-size:13px; color:var(--sub); line-height:1.6;}
+
+  /* 점수판 */
+  .scoreboard{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .sc{background:#f7f9fd; border:1px solid var(--line); border-radius:10px; padding:9px 6px; text-align:center;}
+  .sc .v{font-size:21px; font-weight:800; line-height:1.1;}
+  .sc .l{font-size:11px; color:var(--sub); margin-top:3px;}
+  .sc.time .v{color:var(--accent);}
+  .sc.score .v{color:var(--ok);}
+  .sc.combo .v{color:var(--warn);}
+
+  .timebar{height:8px; border-radius:999px; background:#e8ecf4; overflow:hidden; margin-top:9px;}
+  .timebar i{display:block; height:100%; width:100%; background:var(--accent); transition:width .12s linear;}
+  .timebar.warn i{background:var(--no);}
+
+  /* 퀴즈 */
+  .choices{display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:9px;}
+  .choices .btn{padding:12px 6px; font-size:14px;}
+  .choices .btn.good{background:var(--ok-soft); border-color:var(--ok); color:var(--ok);}
+  .choices .btn.bad{background:var(--no-soft); border-color:var(--no); color:var(--no);}
+
+  .legend{display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:var(--sub); margin-top:8px;}
+  .legend span{display:flex; align-items:center; gap:5px;}
+  .legend i{width:10px; height:10px; border-radius:3px; display:block;}
+
+  .hidden{display:none !important;}
+
+  /* 좁은 화면 (태블릿 세로) */
+  @media (max-width:900px){
+    body{overflow:auto;}
+    #app{height:auto; min-height:100%;}
+    main{grid-template-columns:1fr; height:auto;}
+    .board-wrap{height:56vh; min-height:340px;}
+    header{flex-wrap:wrap; height:auto; padding:8px 12px; gap:10px;}
+    header nav{order:3; width:100%;}
+    header nav button{flex:1;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <h1>🔨 두더지 잡기</h1>
+  <nav>
+    <button class="on" data-tab="learn">① 짝을 찾아라</button>
+    <button data-tab="game">② 두더지 잡기</button>
+    <button data-tab="quiz">③ 관계 맞히기</button>
+  </nav>
+  <a class="home-btn" href="../index.html">← 목차</a>
+</header>
+
+<main>
+  <div class="board-wrap">
+    <canvas id="board"></canvas>
+    <div id="banner"></div>
+  </div>
+
+  <aside>
+    <!-- ================= ① 배우기 ================= -->
+    <section id="pLearn">
+      <div class="blk">
+        <h2><span class="tag">활동 1</span> 짝이 되는 구멍을 찾아라</h2>
+        <p id="learnAsk"></p>
+        <div class="fb info" id="learnProg"></div>
+        <div id="learnFb"></div>
+        <div id="learnTerms"></div>
+      </div>
+
+      <div class="blk">
+        <h2>기준 구멍 바꾸기</h2>
+        <div class="row" id="learnPick"></div>
+        <div class="row" style="margin-top:9px;">
+          <button class="btn sm" id="btnHint">💡 위치 이름 보기</button>
+          <button class="btn sm" id="btnLearnReset">🔄 다시</button>
+        </div>
+      </div>
+
+      <div class="blk">
+        <h2>정리</h2>
+        <p><b>동위각</b> — 두 사거리에서 <b>같은 위치</b>에 있는 두 각<br>
+           <b>엇각</b> — 두 도로 <b>사이(안쪽)</b>에서 <b>엇갈린 위치</b>에 있는 두 각</p>
+        <div class="legend">
+          <span><i style="background:#2f9e63"></i>동위각</span>
+          <span><i style="background:#f5820b"></i>엇각</span>
+          <span><i style="background:#8e4ec6"></i>맞꼭지각</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= ② 게임 ================= -->
+    <section id="pGame" class="hidden">
+      <div class="blk">
+        <h2><span class="tag">활동 2</span> 60초 두더지 잡기</h2>
+        <div class="scoreboard">
+          <div class="sc time"><div class="v" id="gTime">60</div><div class="l">남은 시간</div></div>
+          <div class="sc score"><div class="v" id="gScore">0</div><div class="l">점수</div></div>
+          <div class="sc combo"><div class="v" id="gCombo">0</div><div class="l">연속 정답</div></div>
+        </div>
+        <div class="timebar" id="gBarWrap"><i id="gBar"></i></div>
+        <div id="gFb"></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn primary" id="btnGameStart">▶ 시작하기</button>
+          <button class="btn sm" id="btnGameStop">■ 그만</button>
+        </div>
+      </div>
+
+      <div class="blk">
+        <h2>게임 방법</h2>
+        <p>👑 <b>왕관 두더지</b>가 기준이에요.<br>
+           위에 뜨는 지시(<b>동위각</b> 또는 <b>엇각</b>)에 맞는 자리의 두더지를 두드리세요.<br>
+           시간이 지날수록 두더지가 빨리 숨어요!</p>
+        <div class="fb info" id="gBest"></div>
+      </div>
+
+      <div class="blk hidden" id="gResult">
+        <h2>결과</h2>
+        <div id="gResultBody"></div>
+      </div>
+    </section>
+
+    <!-- ================= ③ 퀴즈 ================= -->
+    <section id="pQuiz" class="hidden">
+      <div class="blk">
+        <h2><span class="tag">활동 3</span> 두 각의 관계는?</h2>
+        <p id="qAsk">보드에서 <b style="color:#3e63dd">파란 테두리</b>와
+           <b style="color:#e5484d">빨간 테두리</b>로 표시된 두 각의 관계를 고르세요.</p>
+        <div class="choices">
+          <button class="btn" data-ans="dongwi">동위각</button>
+          <button class="btn" data-ans="eot">엇각</button>
+          <button class="btn" data-ans="matggokji">맞꼭지각</button>
+          <button class="btn" data-ans="none">셋 다 아님</button>
+        </div>
+        <div id="qFb"></div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn primary hidden" id="btnQNext">다음 문제 ▶</button>
+          <button class="btn sm" id="btnQReset">🔄 처음부터</button>
+        </div>
+      </div>
+
+      <div class="blk">
+        <h2>진행 상황</h2>
+        <div class="scoreboard">
+          <div class="sc"><div class="v" id="qNo">1</div><div class="l">문제 번호</div></div>
+          <div class="sc score"><div class="v" id="qRight">0</div><div class="l">맞힘</div></div>
+          <div class="sc"><div class="v" id="qTotal">10</div><div class="l">전체</div></div>
+        </div>
+        <div id="qDone"></div>
+      </div>
+    </section>
+  </aside>
+</main>
+
+</div>
+
+<script>
+(function(){
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   1. 판(사거리 두 개 + 구멍 여덟 개) 정의
+   교과서 152쪽 〈그림 2〉와 같은 번호를 쓴다.
+
+     위 사거리(직선 l 과 n)      : ③ 좌상  ② 우상  ④ 좌하  ① 우하
+     아래 사거리(직선 m 과 n)    : ⑦ 좌상  ⑥ 우상  ⑧ 좌하  ⑤ 우하
+
+     동위각 : ①-⑤  ②-⑥  ③-⑦  ④-⑧   (같은 위치 = 번호 + 4)
+     엇각   : ①-⑦  ④-⑥              (두 도로 사이에서 엇갈린 위치)
+     맞꼭지각: ①-③  ②-④  ⑤-⑦  ⑥-⑧   (같은 사거리에서 마주 봄)
+   ============================================================ */
+/* 설계용 좌표계 — 구멍·두더지·번호표가 모두 이 안에 들어오도록 잡았다
+   (세로로 가장 아래인 ⑧번 구멍과, 위로 가장 높이 솟는 ②번 두더지까지 포함) */
+const DW = 900, DH = 750;
+
+const HOLES = [
+  {n:1, c:0, q:'rb'}, {n:2, c:0, q:'rt'}, {n:3, c:0, q:'lt'}, {n:4, c:0, q:'lb'},
+  {n:5, c:1, q:'rb'}, {n:6, c:1, q:'rt'}, {n:7, c:1, q:'lt'}, {n:8, c:1, q:'lb'}
+];
+const QNAME = {lt:"왼쪽 위", rt:"오른쪽 위", lb:"왼쪽 아래", rb:"오른쪽 아래"};
+const OPP   = {lt:'rb', rb:'lt', rt:'lb', lb:'rt'};
+
+/* 두 구멍(=두 각)의 관계 */
+function rel(i, j){
+  if(i === j) return 'none';
+  const A = HOLES[i], B = HOLES[j];
+  if(A.c === B.c) return OPP[A.q] === B.q ? 'matggokji' : 'none';   // 같은 사거리
+  if(A.q === B.q) return 'dongwi';                                  // 같은 위치
+  const up = (A.c === 0 ? A : B);      // 위 사거리 쪽
+  const dn = (A.c === 0 ? B : A);      // 아래 사거리 쪽
+  const inner   = (up.q === 'lb' || up.q === 'rb') && (dn.q === 'lt' || dn.q === 'rt');
+  const sideOpp = up.q[0] !== dn.q[0]; // 왼쪽 ↔ 오른쪽
+  return (inner && sideOpp) ? 'eot' : 'none';
+}
+function partner(i, kind){
+  for(let j = 0; j < 8; j++) if(rel(i, j) === kind) return j;
+  return -1;
+}
+const REL_KO   = {dongwi:"동위각", eot:"엇각", matggokji:"맞꼭지각", none:"셋 다 아님"};
+const REL_COL  = {dongwi:"#2f9e63", eot:"#f5820b", matggokji:"#8e4ec6", none:"#68738a"};
+const EOT_ABLE = [0, 3, 5, 6];   // 엇각 짝이 있는 구멍(번호 ①④⑥⑦)의 인덱스
+
+/* ---- 도로 기하 ---- */
+function norm(x, y){ const d = Math.hypot(x, y); return {x:x/d, y:y/d}; }
+const CROSS = [{x:498, y:250}, {x:390, y:580}];   // 두 사거리(직선 n 위에 있다)
+const U = norm(1, -0.33);      // 도로 l·m 방향(오른쪽 위)
+const V = norm(-230, 700);     // 도로 n 방향(아래 왼쪽)
+const S = 122, T = 104;        // 사거리에서 구멍까지 떨어진 정도
+
+const POS = HOLES.map(h => {
+  const c = CROSS[h.c];
+  const sx = (h.q[0] === 'r') ?  1 : -1;   // 오른쪽/왼쪽
+  const sy = (h.q[1] === 'b') ?  1 : -1;   // 아래/위
+  return { x: c.x + U.x*S*sx + V.x*T*sy,
+           y: c.y + U.y*S*sx + V.y*T*sy };
+});
+
+/* ============================================================
+   2. 그리기
+   ============================================================ */
+const cv = $("board"), ctx = cv.getContext("2d");
+
+/* 화면 좌표 → 설계 좌표 */
+function viewInfo(){
+  const W = cv.clientWidth, H = cv.clientHeight;
+  const s = Math.min(W/DW, H/DH);
+  return { s, ox:(W - DW*s)/2, oy:(H - DH*s)/2, W, H };
+}
+function toDesign(px, py){
+  const v = viewInfo();
+  return { x:(px - v.ox)/v.s, y:(py - v.oy)/v.s };
+}
+
+/* 구멍(타원) 안을 눌렀는지 — 살짝 넉넉하게 잡는다 */
+function hitHole(p){
+  for(let i = 0; i < 8; i++){
+    const d = POS[i];
+    const dx = (p.x - d.x)/62, dy = (p.y - d.y)/48;
+    if(dx*dx + dy*dy <= 1) return i;
+  }
+  return -1;
+}
+
+const now = () => performance.now();
+function ease(t){ return 1 - Math.pow(1 - t, 3); }
+
+/* ---- 두더지 ---- */
+function drawMole(x, y, pop, king){
+  const h = 74 * pop;
+  if(h < 2) return;
+  ctx.save();
+  ctx.translate(x, y - 6);
+
+  // 몸통
+  const bw = 40, bh = h;
+  ctx.fillStyle = "#8a5a33";
+  ctx.beginPath();
+  ctx.moveTo(-bw, 6);
+  ctx.quadraticCurveTo(-bw, -bh, 0, -bh);
+  ctx.quadraticCurveTo(bw, -bh, bw, 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // 배(밝은 부분)
+  ctx.fillStyle = "#c08c56";
+  ctx.beginPath();
+  ctx.ellipse(0, -bh*0.30, bw*0.52, bh*0.30, 0, 0, 7);
+  ctx.fill();
+
+  if(pop > 0.55){
+    const o = (pop - 0.55) / 0.45;         // 얼굴은 조금 더 올라온 뒤에 나타난다
+    ctx.globalAlpha = o;
+    // 눈
+    ctx.fillStyle = "#2b1c0e";
+    ctx.beginPath(); ctx.ellipse(-13, -bh*0.62, 4.6, 5.4, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse( 13, -bh*0.62, 4.6, 5.4, 0, 0, 7); ctx.fill();
+    // 코
+    ctx.fillStyle = "#e08d9a";
+    ctx.beginPath(); ctx.ellipse(0, -bh*0.46, 7, 5, 0, 0, 7); ctx.fill();
+    // 수염
+    ctx.strokeStyle = "rgba(43,28,14,.45)"; ctx.lineWidth = 1.6;
+    for(const s of [-1, 1]){
+      for(const dy of [-3, 1, 5]){
+        ctx.beginPath();
+        ctx.moveTo(s*9, -bh*0.46 + dy);
+        ctx.lineTo(s*30, -bh*0.46 + dy*1.5);
+        ctx.stroke();
+      }
+    }
+    // 왕관(기준 두더지)
+    if(king){
+      ctx.fillStyle = "#f7c948";
+      ctx.strokeStyle = "#d59b12"; ctx.lineWidth = 1.5;
+      const cy = -bh - 2;
+      ctx.beginPath();
+      ctx.moveTo(-20, cy); ctx.lineTo(-20, cy - 16); ctx.lineTo(-9, cy - 6);
+      ctx.lineTo(0, cy - 20); ctx.lineTo(9, cy - 6); ctx.lineTo(20, cy - 16);
+      ctx.lineTo(20, cy); ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+/* ---- 판 전체 ---- */
+let hintOn = false;
+
+function drawBoard(state){
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const v = viewInfo();
+  ctx.clearRect(0, 0, v.W, v.H);
+  ctx.save();
+  ctx.translate(v.ox, v.oy);
+  ctx.scale(v.s, v.s);
+
+  // 흙바닥 — 캔버스 전체를 덮도록 설계 좌표계에서의 화면 범위를 구해 칠한다
+  const bx0 = -v.ox / v.s,          by0 = -v.oy / v.s;
+  const bx1 = (v.W - v.ox) / v.s,   by1 = (v.H - v.oy) / v.s;
+  ctx.fillStyle = "#e9d9b6";
+  ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+  ctx.fillStyle = "rgba(190,163,116,.5)";
+  for(let i = 0; i < 340; i++){
+    const x = bx0 + (i * 137.7) % (bx1 - bx0);
+    const y = by0 + (i * 219.3) % (by1 - by0);
+    ctx.fillRect(x, y, 2.4, 2.4);
+  }
+
+  // 도로 세 개 (l, m : 서로 평행 / n : 두 도로를 가로지름)
+  function road(px, py, dx, dy){
+    ctx.lineCap = "butt";
+    ctx.beginPath();
+    ctx.moveTo(px - dx*2000, py - dy*2000);
+    ctx.lineTo(px + dx*2000, py + dy*2000);
+    ctx.strokeStyle = "#ded0ae"; ctx.lineWidth = 66; ctx.stroke();
+    ctx.strokeStyle = "#f8f1dc"; ctx.lineWidth = 58; ctx.stroke();
+  }
+  road(CROSS[0].x, CROSS[0].y, U.x, U.y);   // 직선 l
+  road(CROSS[1].x, CROSS[1].y, U.x, U.y);   // 직선 m
+  road(CROSS[0].x, CROSS[0].y, V.x, V.y);   // 직선 n
+
+  // 도로 이름 (l, m, n) — 구멍과 겹치지 않도록 사거리에서 일정 거리 떨어진 곳에 둔다
+  ctx.font = "italic 700 34px 'Times New Roman', serif";
+  ctx.fillStyle = "#a08a5e"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const nameAt = (c, d, k) => ({ x:c.x + d.x*k, y:c.y + d.y*k });
+  const pl = nameAt(CROSS[0], U, -300);   // 직선 l 의 왼쪽 끝
+  const pm = nameAt(CROSS[1], U, -300);   // 직선 m 의 왼쪽 끝
+  const pn = nameAt(CROSS[1], V,  150);   // 직선 n 의 아래쪽 끝
+  ctx.fillText("l", pl.x, pl.y);
+  ctx.fillText("m", pm.x, pm.y);
+  ctx.fillText("n", pn.x, pn.y);
+
+  // 구멍
+  for(let i = 0; i < 8; i++){
+    const p = POS[i];
+    const ring = state.rings && state.rings[i];
+
+    ctx.fillStyle = "rgba(120,96,58,.28)";
+    ctx.beginPath(); ctx.ellipse(p.x, p.y + 5, 50, 24, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#5d4325";
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, 46, 21, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = "#3d2b16";
+    ctx.beginPath(); ctx.ellipse(p.x, p.y - 1, 40, 17, 0, 0, 7); ctx.fill();
+
+    if(ring){
+      ctx.strokeStyle = ring; ctx.lineWidth = 6;
+      ctx.setLineDash(state.dash && state.dash[i] ? [10, 8] : []);
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, 56, 30, 0, 0, 7); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // 두더지
+  (state.moles || []).forEach(m => {
+    const p = POS[m.hole];
+    drawMole(p.x, p.y - 4, m.pop, m.king);
+  });
+
+  // 번호표
+  for(let i = 0; i < 8; i++){
+    const p = POS[i];
+    const bx = p.x + 44, by = p.y - 26;
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#c9b590"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(bx, by, 18, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#3a2f1e";
+    ctx.font = "800 20px Pretendard, 'Malgun Gothic', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(i + 1), bx, by + 1);
+
+    if(hintOn){
+      ctx.fillStyle = "rgba(58,47,30,.85)";
+      ctx.font = "700 16px Pretendard, 'Malgun Gothic', sans-serif";
+      ctx.fillText(QNAME[HOLES[i].q], p.x, p.y + 42);
+    }
+  }
+
+  // 망치 이펙트
+  (state.hits || []).forEach(h => {
+    const t = (now() - h.t) / 420;
+    if(t > 1) return;
+    ctx.save();
+    ctx.globalAlpha = 1 - t;
+    ctx.translate(h.x, h.y - 30 - t*26);
+    ctx.rotate(-0.9 + t*1.5);
+    ctx.font = "46px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("🔨", 0, 0);
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
+/* ============================================================
+   3. 모드 관리
+   ============================================================ */
+let mode = "learn";
+let anim = { moles: [], rings: {}, dash: {}, hits: [] };
+
+function loop(){
+  anim.moles.forEach(m => {
+    const t = Math.min(1, (now() - m.born) / 260);
+    m.pop = m.dying ? Math.max(0, 1 - (now() - m.dying)/180) : ease(t);
+  });
+  anim.moles = anim.moles.filter(m => m.pop > 0.01 || !m.dying);
+  anim.hits   = anim.hits.filter(h => now() - h.t < 460);
+  drawBoard(anim);
+  requestAnimationFrame(loop);
+}
+
+function addMole(hole, king){
+  anim.moles.push({ hole, king:!!king, born:now(), pop:0, dying:0 });
+}
+function clearMoles(){ anim.moles.forEach(m => { if(!m.dying) m.dying = now(); }); }
+function killMole(hole){
+  const m = anim.moles.find(m => m.hole === hole && !m.dying);
+  if(m) m.dying = now();
+}
+
+function banner(html){
+  const b = $("banner");
+  if(!html){ b.classList.remove("show"); return; }
+  b.innerHTML = html; b.classList.add("show");
+}
+
+/* 탭 전환 */
+document.querySelectorAll("header nav button").forEach(b => {
+  b.addEventListener("click", () => {
+    document.querySelectorAll("header nav button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    mode = b.dataset.tab;
+    $("pLearn").classList.toggle("hidden", mode !== "learn");
+    $("pGame") .classList.toggle("hidden", mode !== "game");
+    $("pQuiz") .classList.toggle("hidden", mode !== "quiz");
+    stopGame(true);
+    anim.moles = []; anim.rings = {}; anim.dash = {}; banner("");
+    if(mode === "learn") learnStart(learnTarget);
+    if(mode === "game")  gameIdle();
+    if(mode === "quiz")  quizStart();
+  });
+});
+
+/* 판 클릭 */
+cv.addEventListener("click", ev => {
+  const p = toDesign(ev.offsetX, ev.offsetY);
+  const i = hitHole(p);
+  anim.hits.push({ x:p.x, y:p.y, t:now() });
+  if(i < 0) return;
+  if(mode === "learn") learnClick(i);
+  else if(mode === "game") gameClick(i);
+});
+
+/* ============================================================
+   4. 활동 ① — 짝을 찾아라 (교과서 152쪽 발견하기)
+   ============================================================ */
+let learnTarget = 0, learnFound = new Set();
+
+function learnTargets(i){
+  const list = [];
+  const d = partner(i, "dongwi"); if(d >= 0) list.push(d);
+  const e = partner(i, "eot");    if(e >= 0) list.push(e);
+  return list;
+}
+
+function learnStart(i){
+  learnTarget = i;
+  learnFound = new Set();
+  anim.moles = []; anim.rings = {}; anim.dash = {};
+  addMole(i, true);
+  anim.rings[i] = "#f7c948";
+
+  const need = learnTargets(i);
+  $("learnAsk").innerHTML =
+    `<b>${i+1}번</b> 구멍에 두더지가 나타났어요.<br>` +
+    `다른 두더지가 어느 구멍에 나타나야 점수를 얻을 수 있을까요?<br>` +
+    `<b>같은 위치</b> 또는 <b>엇갈린 위치</b>에 있는 구멍을 모두 두드려 보세요.`;
+  $("learnFb").innerHTML = "";
+  $("learnTerms").innerHTML = "";
+  learnProg();
+  banner(`👑 <b>${i+1}번</b> 두더지의 짝을 찾아라!`);
+  document.querySelectorAll("#learnPick .btn").forEach(b =>
+    b.classList.toggle("on", +b.dataset.i === i));
+}
+
+function learnProg(){
+  const need = learnTargets(learnTarget);
+  $("learnProg").innerHTML =
+    `찾은 짝 <b>${learnFound.size} / ${need.length}</b>` +
+    (need.length === 1 ? " &nbsp;·&nbsp; 이 구멍은 두 도로 <b>바깥쪽</b>이라 엇각 짝이 없어요." : "");
+}
+
+function learnClick(i){
+  if(i === learnTarget){
+    $("learnFb").innerHTML = `<div class="fb no">여기는 기준이 되는 👑 두더지예요. 다른 구멍을 찾아보세요!</div>`;
+    return;
+  }
+  if(learnFound.has(i)) return;
+
+  const r = rel(learnTarget, i);
+  if(r === "dongwi" || r === "eot"){
+    learnFound.add(i);
+    addMole(i);
+    anim.rings[i] = REL_COL[r];
+    const msg = (r === "dongwi")
+      ? `정답! <b>${i+1}번</b>은 <b>${learnTarget+1}번</b>과 사거리에서 <b>같은 위치</b>(${QNAME[HOLES[i].q]})예요.`
+      : `정답! <b>${i+1}번</b>은 두 도로 <b>사이</b>에서 <b>${learnTarget+1}번</b>과 <b>엇갈린 위치</b>에 있어요.`;
+    $("learnFb").innerHTML = `<div class="fb ok">🎉 ${msg}</div>`;
+    learnProg();
+    if(learnFound.size === learnTargets(learnTarget).length) learnDone();
+  }else{
+    let why;
+    if(r === "matggokji"){
+      why = `<b>${i+1}번</b>은 <b>${learnTarget+1}번</b>과 <b>같은 사거리</b>에서 마주 보는 각(맞꼭지각)이에요. 짝은 <b>다른 사거리</b>에서 찾아야 해요.`;
+    }else if(HOLES[i].c === HOLES[learnTarget].c){
+      why = `<b>${i+1}번</b>은 <b>${learnTarget+1}번</b>과 같은 사거리에 있어요. 짝은 <b>다른 사거리</b>에 있어요.`;
+    }else{
+      why = `위치가 맞지 않아요. 사거리를 기준으로 <b>위/아래</b>와 <b>왼쪽/오른쪽</b>을 견주어 보세요.`;
+    }
+    $("learnFb").innerHTML = `<div class="fb no">🤔 ${why}</div>`;
+    anim.rings[i] = "#e5484d"; anim.dash[i] = true;
+    setTimeout(() => { delete anim.rings[i]; delete anim.dash[i]; }, 900);
+  }
+}
+
+function learnDone(){
+  const d = partner(learnTarget, "dongwi"), e = partner(learnTarget, "eot");
+  let html = `<div class="term"><h3>같은 위치 → <span class="k">동위각</span></h3>` +
+             `<p>${learnTarget+1}번과 ${d+1}번은 두 사거리에서 똑같이 <b>${QNAME[HOLES[learnTarget].q]}</b>에 있어요. ` +
+             `이렇게 같은 위치에 있는 두 각을 <b>동위각</b>이라고 해요.</p></div>`;
+  if(e >= 0){
+    html += `<div class="term et"><h3>엇갈린 위치 → <span class="k">엇각</span></h3>` +
+            `<p>${learnTarget+1}번과 ${e+1}번은 두 도로 <b>사이(안쪽)</b>에서 서로 엇갈려 있어요. ` +
+            `이런 두 각을 <b>엇각</b>이라고 해요.</p></div>`;
+  }else{
+    html += `<div class="term et"><h3><span class="k">엇각</span>은 안쪽에서만</h3>` +
+            `<p>${learnTarget+1}번은 두 도로 <b>바깥쪽</b>에 있어서 엇각인 짝이 없어요. ` +
+            `엇각은 두 도로 <b>사이</b>에 있는 ①·④·⑥·⑦번에서만 짝을 이뤄요.</p></div>`;
+  }
+  html += `<div class="fb info" style="margin-top:9px;">동위각과 엇각은 두 도로가 <b>평행하지 않아도</b> 정할 수 있어요. ` +
+          `평행할 때 각의 <b>크기</b>가 어떻게 되는지는 다음 활동에서 알아봐요!</div>`;
+  $("learnTerms").innerHTML = html;
+  banner(`🎉 짝을 모두 찾았어요!`);
+}
+
+/* 기준 구멍 고르는 버튼 */
+(function(){
+  const wrap = $("learnPick");
+  for(let i = 0; i < 8; i++){
+    const b = document.createElement("button");
+    b.className = "btn num sm"; b.textContent = i + 1; b.dataset.i = i;
+    b.addEventListener("click", () => learnStart(i));
+    wrap.appendChild(b);
+  }
+})();
+$("btnHint").addEventListener("click", e => {
+  hintOn = !hintOn;
+  e.currentTarget.classList.toggle("on", hintOn);
+  e.currentTarget.textContent = hintOn ? "💡 위치 이름 숨기기" : "💡 위치 이름 보기";
+});
+$("btnLearnReset").addEventListener("click", () => learnStart(learnTarget));
+
+/* ============================================================
+   5. 활동 ② — 두더지 잡기 게임
+   ============================================================ */
+const BEST_KEY = "ch4.mole.best";
+let G = null, gTimer = null;
+
+function showBest(){
+  const b = +(localStorage.getItem(BEST_KEY) || 0);
+  $("gBest").innerHTML = `🏆 최고 점수 <b>${b}점</b>`;
+}
+function gameIdle(){
+  banner("▶ 시작하기를 눌러 보세요");
+  showBest();
+  $("gTime").textContent = 60; $("gScore").textContent = 0; $("gCombo").textContent = 0;
+  $("gBar").style.width = "100%";
+  $("gFb").innerHTML = ""; $("gResult").classList.add("hidden");
+}
+
+function startGame(){
+  stopGame(true);
+  G = { time:60000, start:now(), score:0, combo:0, best:0,
+        round:null, stats:{dongwi:[0,0], eot:[0,0]} };
+  $("gResult").classList.add("hidden");
+  nextRound();
+  gTimer = setInterval(tickGame, 60);
+}
+
+function stopGame(quiet){
+  if(gTimer){ clearInterval(gTimer); gTimer = null; }
+  if(G && !quiet) endGame();
+  G = null;
+  clearMoles(); anim.rings = {};
+}
+
+function nextRound(){
+  if(!G) return;
+  clearMoles(); anim.rings = {};
+
+  const elapsed = (now() - G.start) / 1000;
+  const life = Math.max(2200, 4000 - elapsed * 30);   // 갈수록 짧아진다
+
+  const kind = Math.random() < 0.5 ? "dongwi" : "eot";
+  const base = (kind === "eot")
+    ? EOT_ABLE[Math.floor(Math.random() * EOT_ABLE.length)]
+    : Math.floor(Math.random() * 8);
+  const ans = partner(base, kind);
+
+  // 헷갈리게 하는 두더지 두 마리
+  const pool = [];
+  for(let i = 0; i < 8; i++) if(i !== base && i !== ans) pool.push(i);
+  pool.sort(() => Math.random() - 0.5);
+  const decoys = pool.slice(0, 2);
+
+  G.round = { base, ans, kind, born:now(), life, done:false };
+
+  addMole(base, true);
+  [ans, ...decoys].sort(() => Math.random() - 0.5).forEach(h => addMole(h));
+
+  const label = kind === "dongwi"
+    ? `<b class="dw">동위각</b>` : `<b class="et">엇각</b>`;
+  banner(`👑 ${base+1}번의 ${label} 자리를 두드려!`);
+}
+
+function tickGame(){
+  if(!G) return;
+  const left = G.time - (now() - G.start);
+  const sec = Math.max(0, Math.ceil(left / 1000));
+  $("gTime").textContent = sec;
+  $("gBar").style.width = Math.max(0, left / G.time * 100) + "%";
+  $("gBarWrap").classList.toggle("warn", sec <= 10);
+
+  if(left <= 0){ endGame(); return; }
+
+  const r = G.round;
+  if(r && !r.done && now() - r.born > r.life){
+    r.done = true;
+    G.combo = 0; $("gCombo").textContent = 0;
+    G.stats[r.kind][1]++;
+    $("gFb").innerHTML =
+      `<div class="fb no">⏰ 두더지가 숨었어요! ${r.base+1}번의 ${REL_KO[r.kind]}은 <b>${r.ans+1}번</b>이에요.</div>`;
+    anim.rings[r.ans] = REL_COL[r.kind];
+    setTimeout(nextRound, 850);
+  }
+}
+
+function gameClick(i){
+  if(!G || !G.round || G.round.done) return;
+  const r = G.round;
+  if(i === r.base) return;                 // 기준 두더지는 그냥 무시
+  const m = anim.moles.find(m => m.hole === i && !m.dying);
+  if(!m) return;                           // 두더지가 없는 구멍
+
+  r.done = true;
+  if(i === r.ans){
+    G.combo++;
+    const bonus = G.combo >= 5 ? 10 : (G.combo >= 3 ? 5 : 0);
+    G.score += 10 + bonus;
+    G.stats[r.kind][0]++;
+    $("gScore").textContent = G.score;
+    $("gCombo").textContent = G.combo;
+    $("gFb").innerHTML =
+      `<div class="fb ok">🎉 정답! ${r.base+1}번의 ${REL_KO[r.kind]} = <b>${r.ans+1}번</b>` +
+      (bonus ? ` &nbsp;<b>+${bonus} 연속 보너스!</b>` : "") + `</div>`;
+    anim.rings[i] = REL_COL[r.kind];
+    killMole(i);
+  }else{
+    G.combo = 0; $("gCombo").textContent = 0;
+    G.stats[r.kind][1]++;
+    const why = REL_KO[rel(r.base, i)];
+    $("gFb").innerHTML =
+      `<div class="fb no">아쉬워요! ${i+1}번은 ${r.base+1}번과 <b>${why}</b> 관계예요. ` +
+      `${REL_KO[r.kind]}은 <b>${r.ans+1}번</b>이에요.</div>`;
+    anim.rings[i] = "#e5484d";
+    anim.rings[r.ans] = REL_COL[r.kind];
+  }
+  setTimeout(nextRound, 900);
+}
+
+function endGame(){
+  if(gTimer){ clearInterval(gTimer); gTimer = null; }
+  if(!G) return;
+  const sc = G.score, st = G.stats;
+  const best = Math.max(sc, +(localStorage.getItem(BEST_KEY) || 0));
+  try{ localStorage.setItem(BEST_KEY, best); }catch(e){}
+
+  clearMoles(); anim.rings = {};
+  banner(`게임 끝! 점수 ${sc}점`);
+  $("gResult").classList.remove("hidden");
+  const line = (k) => {
+    const [o, x] = st[k], t = o + x;
+    return `<p><b>${REL_KO[k]}</b> — ${t}문제 중 <b style="color:var(--ok)">${o}개</b> 맞힘</p>`;
+  };
+  $("gResultBody").innerHTML =
+    `<div class="fb ok" style="font-size:16px;">최종 점수 <b>${sc}점</b>${sc >= best ? " 🏆 최고 기록!" : ""}</div>` +
+    line("dongwi") + line("eot") +
+    `<div class="row" style="margin-top:9px;"><button class="btn primary" id="btnAgain">🔄 한 번 더</button></div>`;
+  $("btnAgain").addEventListener("click", startGame);
+  G = null;
+  showBest();
+}
+
+$("btnGameStart").addEventListener("click", startGame);
+$("btnGameStop") .addEventListener("click", () => { if(G) endGame(); });
+
+/* ============================================================
+   6. 활동 ③ — 두 각의 관계 맞히기
+   ============================================================ */
+const Q_TOTAL = 10;
+let Q = null;
+
+function makeQuestion(prev){
+  // 네 가지 관계가 골고루 나오도록 만들되, 직전 문제와 같은 짝은 피한다
+  const kinds = ["dongwi", "eot", "matggokji", "none"];
+  for(let tryN = 0; tryN < 20; tryN++){
+    const want = kinds[Math.floor(Math.random() * kinds.length)];
+    const pairs = [];
+    for(let i = 0; i < 8; i++) for(let j = i + 1; j < 8; j++)
+      if(rel(i, j) === want) pairs.push([i, j]);
+    const p = pairs[Math.floor(Math.random() * pairs.length)];
+    if(prev && ((prev.a === p[0] && prev.b === p[1]) || (prev.a === p[1] && prev.b === p[0]))) continue;
+    return Math.random() < 0.5 ? {a:p[0], b:p[1], ans:want} : {a:p[1], b:p[0], ans:want};
+  }
+  return {a:0, b:4, ans:"dongwi"};
+}
+
+function quizStart(){
+  Q = { no:1, right:0, cur:null, answered:false };
+  $("qRight").textContent = 0;
+  $("qTotal").textContent = Q_TOTAL;
+  $("qDone").innerHTML = "";
+  quizNext();
+}
+
+function quizNext(){
+  if(Q.no > Q_TOTAL){ quizEnd(); return; }
+  Q.cur = makeQuestion(Q.cur);
+  Q.answered = false;
+  anim.moles = []; anim.rings = {}; anim.dash = {};
+  anim.rings[Q.cur.a] = "#3e63dd";
+  anim.rings[Q.cur.b] = "#e5484d";
+  addMole(Q.cur.a); addMole(Q.cur.b);
+
+  $("qNo").textContent = Q.no;
+  $("qFb").innerHTML = "";
+  $("btnQNext").classList.add("hidden");
+  document.querySelectorAll(".choices .btn").forEach(b => {
+    b.classList.remove("good", "bad"); b.disabled = false;
+  });
+  banner(`<b style="color:#8fb0ff">${Q.cur.a+1}번</b>과 <b style="color:#ff9b9e">${Q.cur.b+1}번</b>은 무슨 관계일까?`);
+}
+
+document.querySelectorAll(".choices .btn").forEach(b => {
+  b.addEventListener("click", () => {
+    if(!Q || Q.answered) return;
+    Q.answered = true;
+    const pick = b.dataset.ans, ans = Q.cur.ans;
+    document.querySelectorAll(".choices .btn").forEach(x => {
+      x.disabled = true;
+      if(x.dataset.ans === ans) x.classList.add("good");
+    });
+    if(pick !== ans) b.classList.add("bad"); else Q.right++;
+    $("qRight").textContent = Q.right;
+
+    const A = Q.cur.a, B = Q.cur.b;
+    let why;
+    if(ans === "dongwi")
+      why = `두 사거리에서 <b>똑같이 ${QNAME[HOLES[A].q]}</b>에 있으므로 <b>동위각</b>이에요.`;
+    else if(ans === "eot")
+      why = `두 도로 <b>사이</b>에서 서로 <b>엇갈린 위치</b>에 있으므로 <b>엇각</b>이에요.`;
+    else if(ans === "matggokji")
+      why = `<b>같은 사거리</b>에서 서로 <b>마주 보고</b> 있으므로 <b>맞꼭지각</b>이에요.`;
+    else if(HOLES[A].c === HOLES[B].c)
+      why = `같은 사거리에서 <b>이웃한</b> 두 각이에요. 동위각·엇각·맞꼭지각 어느 것도 아니에요.`;
+    else
+      why = `다른 사거리에 있지만 위치가 같지도, 안쪽에서 엇갈리지도 않아요. 셋 다 아니에요.`;
+
+    $("qFb").innerHTML =
+      `<div class="fb ${pick === ans ? "ok" : "no"}">${pick === ans ? "🎉 정답!" : `아쉬워요. 답은 <b>${REL_KO[ans]}</b>!`} ${why}</div>`;
+    anim.rings[A] = anim.rings[B] = REL_COL[ans];
+    $("btnQNext").classList.remove("hidden");
+    $("btnQNext").textContent = Q.no >= Q_TOTAL ? "결과 보기 ▶" : "다음 문제 ▶";
+  });
+});
+
+$("btnQNext").addEventListener("click", () => { Q.no++; quizNext(); });
+$("btnQReset").addEventListener("click", quizStart);
+
+function quizEnd(){
+  const r = Q.right;
+  const msg = r >= 9 ? "완벽해요! 동위각과 엇각을 정확히 알고 있어요. 🏆"
+            : r >= 7 ? "잘했어요! 헷갈린 문제만 다시 살펴봐요. 👍"
+            : "활동 ①로 돌아가 위치를 다시 확인해 봐요. 💪";
+  $("qDone").innerHTML =
+    `<div class="fb ${r >= 7 ? "ok" : "info"}" style="margin-top:9px; font-size:15px;">` +
+    `${Q_TOTAL}문제 중 <b>${r}문제</b> 맞혔어요.<br>${msg}</div>`;
+  anim.moles = []; anim.rings = {};
+  banner(`퀴즈 끝! ${Q_TOTAL}문제 중 ${r}문제`);
+  $("btnQNext").classList.add("hidden");
+}
+
+/* ============================================================
+   7. 시작
+   common.js 는 defer 로 불러오므로 이 인라인 스크립트보다 늦게 실행된다.
+   MK 가 준비되는 DOMContentLoaded 이후에 시작한다.
+   ============================================================ */
+function boot(){
+  if(window.MK && MK.fit) MK.fit(cv);
+  learnStart(0);
+  requestAnimationFrame(loop);
+}
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", boot);
+}else{
+  boot();
+}
+
+})();
+</script>
+</body>
+</html>
